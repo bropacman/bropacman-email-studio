@@ -346,8 +346,6 @@ body {
 
 .email-body a {
   color: var(--accent);
-  pointer-events: none;
-  cursor: default;
 }
 
 #pv-layout {

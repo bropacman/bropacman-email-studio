@@ -59,6 +59,39 @@
     },
   ];
 
+  // Normalizes the body HTML: unwraps empty/no-op <span> tags (handled via
+  // the DOM, not regex, so nesting doesn't break it), strips Word/Outlook
+  // paste artifacts (mso- inline styles, empty <o:p> tags, Mso* classes,
+  // conditional comments), collapses runs of non-breaking spaces and <br>
+  // tags, and collapses/trims redundant empty paragraphs - the usual mess
+  // left behind by pasting from Word, Outlook, or Google Docs.
+  function cleanUpBodyContent() {
+    if (!bodyEditor) return;
+    const dom = bodyEditor.dom;
+
+    dom.select("span", bodyEditor.getBody()).forEach((span) => {
+      const style = (span.getAttribute("style") || "").trim();
+      const cls = (span.getAttribute("class") || "").trim();
+      if (!style && !cls) dom.remove(span, true);
+    });
+
+    let html = bodyEditor.getContent();
+
+    html = html.replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, "");
+    html = html.replace(/<o:p>\s*<\/o:p>/gi, "");
+    html = html.replace(/\s*mso-[a-z-]+\s*:[^;"']+;?/gi, "");
+    html = html.replace(/\sclass="Mso[A-Za-z0-9]*"/gi, "");
+    html = html.replace(/(?:&nbsp;| ){2,}/gi, " ");
+    html = html.replace(/(<br\s*\/?>\s*){3,}/gi, "<br><br>");
+    html = html.replace(/(?:<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*){2,}/gi, "<p>&nbsp;</p>");
+    html = html.replace(/^(?:\s*<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)+/i, "");
+    html = html.replace(/(?:\s*<p>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>\s*)+$/i, "");
+    html = html.replace(/\s(?:style|class)="\s*"/gi, "");
+
+    bodyEditor.setContent(html.trim());
+    render();
+  }
+
   // Captures the editor via the setup() callback (guaranteed to fire once
   // TinyMCE attaches to #body) and resolves once it's actually ready, rather
   // than relying on interpreting tinymce.init()'s own return value.
@@ -76,7 +109,7 @@
         height: 320,
         plugins: "lists link code autolink",
         toolbar:
-          "undo redo | fontfamily | bold italic underline | bullist numlist outdent indent | link | code",
+          "undo redo | fontfamily | bold italic underline | bullist numlist outdent indent | link | code | cleanupformatting",
         // Match the font stacks the Beacon layout itself uses (see
         // layoutHtml in config/templates.json), so picking "Montserrat" or
         // "Lora" here previews the same fallback chain the real layout gets.
@@ -96,6 +129,11 @@
           'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }',
         setup(editor) {
           bodyEditor = editor;
+          editor.ui.registry.addButton("cleanupformatting", {
+            icon: "remove-formatting",
+            tooltip: "Clean up formatting (remove redundant spans, spacing, empty paragraphs)",
+            onAction: () => cleanUpBodyContent(),
+          });
           // Not "SetContent": applyPreset() calls setContent() itself and
           // explicitly re-renders afterward once currentLayoutHtml/header
           // fields are updated. Also listening for SetContent here fires a
@@ -197,13 +235,21 @@
   }
 
   // Links in a real layout (or in pasted-in body HTML) are ordinary <a
-  // href> tags. Inside the preview iframe, clicking one navigates the
-  // iframe itself away from the rendered srcdoc to that URL - which is
-  // almost always a placeholder/dead link here - replacing the preview with
-  // a broken page. !important so it wins regardless of the layout's own
-  // link styling. Only used for the live preview, not for the exported/
-  // copied HTML, where links should stay real and clickable.
-  const PREVIEW_LINK_GUARD = "<style>a{pointer-events:none!important;cursor:default!important;}</style>";
+  // href> tags. Inside the preview iframe, clicking one would otherwise
+  // navigate the iframe itself away from the rendered srcdoc to that URL -
+  // which is almost always a placeholder/dead link here - replacing the
+  // preview with a broken page. <base target="_blank"> makes every link in
+  // the iframe open in a new tab instead, leaving the preview itself intact.
+  const PREVIEW_LINK_TARGET = '<base target="_blank">';
+
+  // Same idea for the simple-mode preview, which isn't in an iframe: force
+  // every link to open in a new tab rather than navigating the app away.
+  function openLinksInNewTab(container) {
+    container.querySelectorAll("a[href]").forEach((a) => {
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+    });
+  }
 
   function resizeLayoutFrame() {
     try {
@@ -230,11 +276,19 @@
       els.pv.banner.hidden = true;
       els.pv.body.hidden = true;
       els.pv.layout.hidden = false;
+      // Fallback-font stripping has to apply to the body too, not just the
+      // static layout wrapper - a header styled via the editor's own font
+      // picker (e.g. a bold Montserrat section heading) lives in the body,
+      // and would otherwise keep rendering in Montserrat regardless of this
+      // toggle.
       const sourceLayout = els.fallbackFonts.checked
         ? stripWebFonts(currentLayoutHtml)
         : currentLayoutHtml;
+      const sourceBody = els.fallbackFonts.checked
+        ? stripWebFonts(renderBodyHtml())
+        : renderBodyHtml();
       els.pv.layout.srcdoc =
-        PREVIEW_LINK_GUARD + fillLayoutPlaceholders(sourceLayout, renderBodyHtml());
+        PREVIEW_LINK_TARGET + fillLayoutPlaceholders(sourceLayout, sourceBody);
       els.pv.layout.onload = resizeLayoutFrame;
     } else {
       els.pv.layout.hidden = true;
@@ -247,6 +301,7 @@
       els.pv.banner.style.background = els.headerColor.value;
 
       els.pv.body.innerHTML = renderBodyHtml() || "<em>(empty body)</em>";
+      openLinksInNewTab(els.pv.body);
     }
   }
 
@@ -269,7 +324,8 @@
       const sourceLayout = els.fallbackFonts.checked
         ? stripWebFonts(currentLayoutHtml)
         : currentLayoutHtml;
-      const layoutContent = fillLayoutPlaceholders(sourceLayout, bodyHtml);
+      const strippedBodyHtml = els.fallbackFonts.checked ? stripWebFonts(bodyHtml) : bodyHtml;
+      const layoutContent = fillLayoutPlaceholders(sourceLayout, strippedBodyHtml);
       return `<!DOCTYPE html>
 <html>
 <head>

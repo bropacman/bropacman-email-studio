@@ -83,6 +83,13 @@ usage cap. Only a minimal set of plugins is included (`lists`, `link`,
 button (the `code` plugin) lets you view or hand-edit the raw HTML when
 needed.
 
+A "Clean up formatting" toolbar button normalizes the body:
+unwraps empty/no-op `<span>` tags, strips Word/Outlook paste artifacts
+(`mso-` styles, empty `<o:p>` tags, `Mso*` classes, conditional comments),
+collapses runs of non-breaking spaces and `<br>` tags, and collapses/trims
+redundant empty paragraphs — useful after pasting content in from Word,
+Outlook, or Google Docs. See `cleanUpBodyContent()` in `app.js`.
+
 The font picker's options are defined in `font_family_formats` in
 `initTinyMce()` in `app.js` — add an entry there (and to the Google Fonts
 `<link>`/`@import` URLs alongside it, and in `index.html`'s `<head>` and the
@@ -132,7 +139,14 @@ notification layouts — add a `layoutHtml` field instead of `headerText` /
 - A "Preview with fallback fonts" checkbox appears for these templates so you
   can check how the layout degrades if a recipient's mail client blocks the
   web fonts (Google Fonts `<link>` tags get stripped and the CSS font-stack's
-  next entry is used).
+  next entry is used). This applies to the body too, not just the static
+  layout — a font applied via the editor's font picker (e.g. a Montserrat
+  section heading) falls back correctly as well.
+- Links inside the preview (both this iframe and the simple-template preview)
+  always open in a new tab (`<base target="_blank">` for the iframe, a DOM
+  pass forcing `target="_blank"` for the simple preview) instead of
+  navigating the preview itself away — links stay exactly as authored in the
+  exported/copied HTML.
 
 `config/templates.json` currently ships with one real example (`beacon-onboarding`)
 plus two variants (`beacon-hr-case-sample`, `beacon-approval-sample`) that
