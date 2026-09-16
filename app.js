@@ -110,6 +110,10 @@
         plugins: "lists link code autolink",
         toolbar:
           "undo redo | fontfamily | bold italic underline | bullist numlist outdent indent | link | code | cleanupformatting",
+        // "wrap" (rather than the default "floating") shows every toolbar
+        // button, wrapping onto additional rows as needed, instead of
+        // collapsing overflow into a "..." dropdown.
+        toolbar_mode: "wrap",
         // Match the font stacks the Beacon layout itself uses (see
         // layoutHtml in config/templates.json), so picking "Montserrat" or
         // "Lora" here previews the same fallback chain the real layout gets.
@@ -129,8 +133,16 @@
           'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }',
         setup(editor) {
           bodyEditor = editor;
+          // No built-in sparkle/star icon in this icon pack ("ai" is
+          // literally the letters "AI", "ai-assistant" is a magic wand) -
+          // register a custom two-star sparkle instead.
+          editor.ui.registry.addIcon(
+            "sparkles",
+            '<svg width="24" height="24"><path d="M12 2L14 9L21 11L14 13L12 20L10 13L3 11L10 9Z"/>' +
+              '<path d="M19 1L19.9 3.6L22.5 4.5L19.9 5.4L19 8L18.1 5.4L15.5 4.5L18.1 3.6Z"/></svg>'
+          );
           editor.ui.registry.addButton("cleanupformatting", {
-            icon: "remove-formatting",
+            icon: "sparkles",
             tooltip: "Clean up formatting (remove redundant spans, spacing, empty paragraphs)",
             onAction: () => cleanUpBodyContent(),
           });
