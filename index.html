@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bropacman Email Studio</title>
+<!-- Loaded here (not just inside the TinyMCE editor) so the preview pane
+     also renders Montserrat/Lora correctly when applied via the editor's
+     font picker on a simple (non-layout) template. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark">ES</span>
+        <div>
+          <h1>Bropacman Email Studio</h1>
+          <p>Preview what a notification email will actually look like before it's sent &mdash; no login required.</p>
+        </div>
+      </div>
+      <div class="preset-picker">
+        <label for="preset">Start from a template</label>
+        <select id="preset">
+          <option value="">Blank</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="editor" aria-label="Email fields">
+      <div class="field">
+        <label for="from">From</label>
+        <input type="text" id="from" value="ServiceNow <noreply@yourinstance.service-now.com>">
+      </div>
+
+      <div class="field">
+        <label for="to">Recipients (To)</label>
+        <input type="text" id="to" placeholder="jane.doe@example.com, john.smith@example.com" value="jane.doe@example.com">
+      </div>
+
+      <div class="field">
+        <label for="cc">Cc <span class="optional">(optional)</span></label>
+        <input type="text" id="cc" placeholder="manager@example.com">
+      </div>
+
+      <div class="field">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" placeholder="Incident INC0010023 assigned to you">
+      </div>
+
+      <div id="layoutNotice" class="layout-notice" hidden>
+        This template supplies its own full HTML layout (header, fonts, footer).
+        The fields below fill the <code>${notification:body}</code> placeholder inside it,
+        just like a real ServiceNow notification's Message field would.
+        <label class="fallback-toggle">
+          <input type="checkbox" id="fallbackFonts">
+          Preview with fallback fonts (simulate Montserrat/Lora failing to load)
+        </label>
+      </div>
+
+      <div id="simpleHeaderFields">
+        <div class="field">
+          <label for="headerText">Header banner text</label>
+          <input type="text" id="headerText" placeholder="e.g. Incident Assigned to You">
+        </div>
+
+        <div class="field field-row">
+          <label for="headerColor">Banner color</label>
+          <input type="color" id="headerColor" value="#293e40">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="body">Body</label>
+        <textarea id="body" rows="14" placeholder="Write the email body here..."></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="copyHtml" type="button">Copy rendered HTML</button>
+        <button id="downloadHtml" type="button">Download as .html</button>
+      </div>
+    </section>
+
+    <section class="preview-pane" aria-label="Email preview">
+      <div class="window-chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <span class="window-title">Inbox Preview</span>
+      </div>
+
+      <div class="email-shell">
+        <div class="email-meta">
+          <div class="meta-row"><span class="meta-label">From</span><span id="pv-from" class="meta-value"></span></div>
+          <div class="meta-row"><span class="meta-label">To</span><span id="pv-to" class="meta-value"></span></div>
+          <div class="meta-row cc-row"><span class="meta-label">Cc</span><span id="pv-cc" class="meta-value"></span></div>
+          <div class="meta-row"><span class="meta-label">Subject</span><span id="pv-subject" class="meta-value subject-value"></span></div>
+        </div>
+
+        <div id="pv-banner" class="email-banner"></div>
+
+        <div id="pv-body" class="email-body"></div>
+
+        <iframe id="pv-layout" title="Custom layout preview" hidden></iframe>
+
+        <div class="email-footer">
+          This is a preview generated outside of ServiceNow for review purposes only. No email was sent.
+          Not affiliated with, endorsed by, or sponsored by ServiceNow, Inc.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="vendor/tinymce/tinymce.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
