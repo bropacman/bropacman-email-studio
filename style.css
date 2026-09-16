@@ -163,7 +163,7 @@ body {
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--accent);
-  color: #04241a;
+  color: #ffffff;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -173,7 +173,8 @@ body {
   filter: brightness(1.05);
 }
 
-.actions button#downloadHtml {
+.actions button#downloadHtml,
+.actions button#copyBodyHtml {
   background: #fff;
   color: var(--text);
 }

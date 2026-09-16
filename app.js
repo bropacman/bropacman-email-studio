@@ -12,6 +12,7 @@
     preset: document.getElementById("preset"),
     copyHtml: document.getElementById("copyHtml"),
     downloadHtml: document.getElementById("downloadHtml"),
+    copyBodyHtml: document.getElementById("copyBodyHtml"),
     simpleHeaderFields: document.getElementById("simpleHeaderFields"),
     layoutNotice: document.getElementById("layoutNotice"),
     fallbackFonts: document.getElementById("fallbackFonts"),
@@ -341,17 +342,23 @@
   els.preset.addEventListener("change", (e) => applyPreset(e.target.value));
   els.fallbackFonts.addEventListener("change", render);
 
-  els.copyHtml.addEventListener("click", async () => {
-    const html = buildStandaloneHtml();
+  async function copyToClipboard(button, text) {
     try {
-      await navigator.clipboard.writeText(html);
-      const original = els.copyHtml.textContent;
-      els.copyHtml.textContent = "Copied!";
-      setTimeout(() => (els.copyHtml.textContent = original), 1500);
+      await navigator.clipboard.writeText(text);
+      const original = button.textContent;
+      button.textContent = "Copied!";
+      setTimeout(() => (button.textContent = original), 1500);
     } catch (err) {
       alert("Could not copy automatically. Use the Download button instead.");
     }
-  });
+  }
+
+  els.copyHtml.addEventListener("click", () => copyToClipboard(els.copyHtml, buildStandaloneHtml()));
+
+  // Just the Body field's own HTML, no meta block/banner/layout wrapper - for
+  // pasting directly into ServiceNow's Message HTML field, since the layout
+  // (if any) is a separate record there, not part of the notification body.
+  els.copyBodyHtml.addEventListener("click", () => copyToClipboard(els.copyBodyHtml, renderBodyHtml()));
 
   els.downloadHtml.addEventListener("click", () => {
     const html = buildStandaloneHtml();

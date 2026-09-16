@@ -21,8 +21,13 @@ bundled, so there's still nothing to install or compile.
 
 Fill in the fields on the left — including a rich text editor for the body,
 matching ServiceNow's own notification message field — and the right-hand
-pane updates live as an email preview. Use **Copy rendered HTML** or
-**Download as .html** to grab the result and share it.
+pane updates live as an email preview.
+
+- **Copy rendered HTML** / **Download as .html** — the whole simulated email
+  (meta block plus banner or full layout), to share the preview itself.
+- **Copy body HTML only** — just the Body field's own HTML, no wrapper, for
+  pasting straight into ServiceNow's Message HTML field (the layout, if any,
+  is a separate record there, not part of the notification body).
 
 ## Run it locally
 
