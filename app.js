@@ -274,6 +274,23 @@
     }
   }
 
+  // Reassigning an iframe's srcdoc always forces a full reload - the iframe
+  // blanks and repaints even if the new HTML is nearly identical to the old.
+  // render() fires on every keystroke in the body editor, so updating a
+  // layout template's iframe immediately meant a visible flicker on every
+  // character typed. Debouncing just this one operation (everything else in
+  // render() still updates instantly - only the iframe reload is delayed)
+  // waits for a brief pause in typing instead, cutting reload frequency
+  // drastically without making the rest of the preview feel laggy.
+  let layoutFrameTimer = null;
+  function scheduleLayoutFrameUpdate(srcdoc) {
+    clearTimeout(layoutFrameTimer);
+    layoutFrameTimer = setTimeout(() => {
+      els.pv.layout.srcdoc = srcdoc;
+      els.pv.layout.onload = resizeLayoutFrame;
+    }, 250);
+  }
+
   function render() {
     els.pv.from.textContent = els.from.value.trim() || "(no sender set)";
     els.pv.to.textContent = els.to.value.trim() || "(no recipients)";
@@ -299,10 +316,12 @@
       const sourceBody = els.fallbackFonts.checked
         ? stripWebFonts(renderBodyHtml())
         : renderBodyHtml();
-      els.pv.layout.srcdoc =
-        PREVIEW_LINK_TARGET + fillLayoutPlaceholders(sourceLayout, sourceBody);
-      els.pv.layout.onload = resizeLayoutFrame;
+      scheduleLayoutFrameUpdate(PREVIEW_LINK_TARGET + fillLayoutPlaceholders(sourceLayout, sourceBody));
     } else {
+      // Cancel any pending debounced iframe update from before switching
+      // away from a layout template, so it can't fire afterward and
+      // overwrite the srcdoc clear below with stale layout content.
+      clearTimeout(layoutFrameTimer);
       els.pv.layout.hidden = true;
       els.pv.layout.srcdoc = "";
       els.pv.banner.hidden = false;
