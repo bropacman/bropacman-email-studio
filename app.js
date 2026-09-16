@@ -96,7 +96,14 @@
           'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; }',
         setup(editor) {
           bodyEditor = editor;
-          editor.on("input undo redo Change SetContent", () => render());
+          // Not "SetContent": applyPreset() calls setContent() itself and
+          // explicitly re-renders afterward once currentLayoutHtml/header
+          // fields are updated. Also listening for SetContent here fires a
+          // render() mid-applyPreset, before those fields are updated to the
+          // newly-selected template - showing the new body with the
+          // previous template's banner until the explicit render() call
+          // (below, now reordered to run last) corrects it.
+          editor.on("input undo redo Change", () => render());
           editor.on("init", () => resolve(editor));
         },
       });
@@ -189,6 +196,15 @@
     return out;
   }
 
+  // Links in a real layout (or in pasted-in body HTML) are ordinary <a
+  // href> tags. Inside the preview iframe, clicking one navigates the
+  // iframe itself away from the rendered srcdoc to that URL - which is
+  // almost always a placeholder/dead link here - replacing the preview with
+  // a broken page. !important so it wins regardless of the layout's own
+  // link styling. Only used for the live preview, not for the exported/
+  // copied HTML, where links should stay real and clickable.
+  const PREVIEW_LINK_GUARD = "<style>a{pointer-events:none!important;cursor:default!important;}</style>";
+
   function resizeLayoutFrame() {
     try {
       const doc = els.pv.layout.contentDocument;
@@ -217,7 +233,8 @@
       const sourceLayout = els.fallbackFonts.checked
         ? stripWebFonts(currentLayoutHtml)
         : currentLayoutHtml;
-      els.pv.layout.srcdoc = fillLayoutPlaceholders(sourceLayout, renderBodyHtml());
+      els.pv.layout.srcdoc =
+        PREVIEW_LINK_GUARD + fillLayoutPlaceholders(sourceLayout, renderBodyHtml());
       els.pv.layout.onload = resizeLayoutFrame;
     } else {
       els.pv.layout.hidden = true;
@@ -319,8 +336,11 @@
     els.subject.value = p.subject || "";
     els.to.value = p.to || "";
     els.cc.value = p.cc || "";
-    if (bodyEditor) bodyEditor.setContent(p.body || "");
 
+    // Update layout/header state before touching the body editor, so
+    // whatever render() sees - whether triggered by this function's own
+    // final call below or by an event the editor fires internally - already
+    // reflects the newly-selected template, not the previous one.
     if (p.layoutHtml) {
       currentLayoutHtml = p.layoutHtml;
       els.simpleHeaderFields.hidden = true;
@@ -333,6 +353,7 @@
       els.headerColor.value = p.headerColor || "#293e40";
     }
 
+    if (bodyEditor) bodyEditor.setContent(p.body || "");
     render();
   }
 
