@@ -74,7 +74,11 @@ of hand-writing HTML in the config.
 The Body field is a self-hosted [TinyMCE](https://www.tiny.cloud/) editor
 (see `vendor/tinymce/`), not a plain textarea — bold/italic/underline, a
 font family picker (Montserrat/Lora, matching the Beacon layout's fonts,
-plus a couple of common fallbacks), a font size picker (px, matching how
+plus the standard "web-safe" email fonts — Arial, Helvetica, Verdana,
+Tahoma, Trebuchet MS, Segoe UI, Times New Roman, Georgia, Cambria,
+Garamond, Palatino Linotype, Courier New, Lucida Console — so you can pick
+one and see how the body actually renders on a recipient's machine if
+Montserrat/Lora's web fonts don't load), a font size picker (px, matching how
 every layout/body size is expressed elsewhere in this app), bulleted and
 numbered lists with indent/outdent, and links, matching what ServiceNow's
 own notification message field supports. It's the open source Community

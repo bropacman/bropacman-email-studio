@@ -117,13 +117,30 @@
         // Match the font stacks the Beacon layout itself uses (see
         // layoutHtml in config/templates.json), so picking "Montserrat" or
         // "Lora" here previews the same fallback chain the real layout gets.
+        // Everything from "Arial" down is the standard "web-safe" email
+        // font set — fonts that ship pre-installed on Windows and/or macOS,
+        // so no web font has to load for them. They're here so someone can
+        // pick one and see how the body would actually render on a
+        // recipient's machine if Montserrat/Lora's web fonts get stripped
+        // (blocked images/fonts, older Outlook, etc.), not just eyeball the
+        // fallback chain in the CSS.
         font_family_formats:
           "Default=-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
           "Montserrat=Montserrat,arial,sans-serif;" +
           "Lora=Lora,georgia,serif;" +
           "Arial=arial,helvetica,sans-serif;" +
+          "Helvetica=helvetica,arial,sans-serif;" +
+          "Verdana=verdana,geneva,sans-serif;" +
+          "Tahoma=tahoma,geneva,sans-serif;" +
+          "Trebuchet MS=trebuchet ms,helvetica,sans-serif;" +
+          "Segoe UI=segoe ui,tahoma,sans-serif;" +
+          "Times New Roman=times new roman,times,serif;" +
           "Georgia=georgia,palatino,serif;" +
-          "Courier New=courier new,courier,monospace",
+          "Cambria=cambria,georgia,serif;" +
+          "Garamond=garamond,baskerville,serif;" +
+          "Palatino Linotype=palatino linotype,book antiqua,palatino,serif;" +
+          "Courier New=courier new,courier,monospace;" +
+          "Lucida Console=lucida console,monaco,monospace",
         // px, not TinyMCE's default pt sizes, to match how the exported/
         // ServiceNow layout HTML sizes everything (content_style below,
         // and every layoutHtml/body font-size in config/templates.json).
