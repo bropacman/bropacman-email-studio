@@ -109,7 +109,7 @@
         height: 320,
         plugins: "lists link code autolink",
         toolbar:
-          "undo redo | fontfamily | bold italic underline | bullist numlist outdent indent | link | code | cleanupformatting",
+          "undo redo | fontfamily fontsize | bold italic underline | bullist numlist outdent indent | link | code | cleanupformatting",
         // "wrap" (rather than the default "floating") shows every toolbar
         // button, wrapping onto additional rows as needed, instead of
         // collapsing overflow into a "..." dropdown.
@@ -124,6 +124,10 @@
           "Arial=arial,helvetica,sans-serif;" +
           "Georgia=georgia,palatino,serif;" +
           "Courier New=courier new,courier,monospace",
+        // px, not TinyMCE's default pt sizes, to match how the exported/
+        // ServiceNow layout HTML sizes everything (content_style below,
+        // and every layoutHtml/body font-size in config/templates.json).
+        font_size_formats: "10px 12px 14px 16px 18px 20px 24px 28px 32px 36px",
         content_style:
           // @import (rather than content_css) so this loads alongside the
           // theme's own default content CSS instead of replacing it, and

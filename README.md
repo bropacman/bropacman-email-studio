@@ -74,9 +74,11 @@ of hand-writing HTML in the config.
 The Body field is a self-hosted [TinyMCE](https://www.tiny.cloud/) editor
 (see `vendor/tinymce/`), not a plain textarea — bold/italic/underline, a
 font family picker (Montserrat/Lora, matching the Beacon layout's fonts,
-plus a couple of common fallbacks), bulleted and numbered lists with
-indent/outdent, and links, matching what ServiceNow's own notification
-message field supports. It's the open source Community edition (GPL),
+plus a couple of common fallbacks), a font size picker (px, matching how
+every layout/body size is expressed elsewhere in this app), bulleted and
+numbered lists with indent/outdent, and links, matching what ServiceNow's
+own notification message field supports. It's the open source Community
+edition (GPL),
 vendored directly into this repo, so there's no API key, no account, and no
 usage cap. Only a minimal set of plugins is included (`lists`, `link`,
 `code`, `autolink`) to keep the footprint small; a "Source code" toolbar
@@ -95,6 +97,9 @@ The font picker's options are defined in `font_family_formats` in
 `<link>`/`@import` URLs alongside it, and in `index.html`'s `<head>` and the
 simple-template branch of `buildStandaloneHtml`, so it renders consistently
 in the editor, the preview, and exported HTML) if you need another font.
+The size picker's options are `font_size_formats` right below it, in px to
+match everything else in this app — add/remove sizes there if the list
+needs to change.
 
 To update TinyMCE later, download a newer `tinymce` package from npm and
 replace the matching files under `vendor/tinymce/` — the exact set to keep
