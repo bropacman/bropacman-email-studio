@@ -119,8 +119,8 @@
         // "Lora" here previews the same fallback chain the real layout gets.
         font_family_formats:
           "Default=-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;" +
-          "Montserrat=Montserrat,source-sans-pro,roboto,arial,lato,sans-serif;" +
-          "Lora=Lora,cambria,georgia,sans-serif,arial;" +
+          "Montserrat=Montserrat,arial,sans-serif;" +
+          "Lora=Lora,georgia,serif;" +
           "Arial=arial,helvetica,sans-serif;" +
           "Georgia=georgia,palatino,serif;" +
           "Courier New=courier new,courier,monospace",
