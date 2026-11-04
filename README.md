@@ -28,6 +28,138 @@ pane updates live as an email preview.
 - **Copy body HTML only** — just the Body field's own HTML, no wrapper, for
   pasting straight into ServiceNow's Message HTML field (the layout, if any,
   is a separate record there, not part of the notification body).
+- **Copy for Google Docs** — From/To/Cc/Subject as a small table, then the
+  banner (or full layout) and body, with images embedded, formatted to paste
+  cleanly into a Google Doc.
+- The body editor's **full screen** button (far right of its toolbar)
+  expands it over the whole window; press Esc or the button again to exit.
+
+## ServiceNow import (notification review for Google Docs / Sheets)
+
+The **ServiceNow import** tab reads ServiceNow XML exports and turns each
+notification into something a process owner can read and comment on:
+
+- a list of notifications, searchable and grouped by category, filterable by
+  category, table and active
+- **When it sends**: table, insert/update/event, and the `condition` encoded
+  query in plain English (`^` = AND, `^OR` = OR, `^NQ` = a new OR'd query).
+  Field names are shown as-is. Where the export itself includes a label for
+  a reference value (the `<item display_value=...>` rows ServiceNow adds
+  inside `<condition>`), it's shown next to the raw sys_id. Advanced
+  (scripted) conditions show **"Custom script logic — ask HRIT"** instead of
+  a translation.
+- **Who receives it**: recipient fields, users, groups (sys_ids as
+  exported), event parm 1/2 and "send to event creator"
+- a **preview** with editable fake sample data (`${number}` → `HRC0001234`,
+  `${opened_for.name}` → `Jane Sample`, …). `${mail_script:name}` shows up as a
+  **[Dynamic content: name]** box; the script's source appears in a
+  collapsible panel for developers and is never executed.
+- **Copy for Google Docs**: a header table (name, subject, when it sends, who
+  receives it, template, active, last updated, sys_id) above the rendered
+  email, for pasting into that notification's tab in the program's Doc
+- **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
+  per notification in the current filter (name, category, table, trigger
+  summary, recipients summary, active, has advanced condition, uses mail
+  scripts, template name, sys_id, sys_updated_on)
+- **Advanced: edit & download XML** (off by default): edit `subject` and
+  `message_html` of the notification or its template and download a
+  single-record XML **for import into a DEV instance only**
+
+Subject/body precedence follows ServiceNow: the notification's own subject
+and `message_html` are used when filled in, and the template supplies
+whichever of them is empty. The **Content** section says which record each
+came from. The layout comes from the template's `email_layout` (or the
+notification's, if it has one).
+
+Click **Load fake demo data** to try it without an export. The demo uses
+[`fixtures/sample_hr_notifications.xml`](fixtures/sample_hr_notifications.xml),
+which is entirely made up.
+
+### Privacy model
+
+Imported records are HR configuration, so they never leave your machine:
+
+- Everything you import, the sample data, and your edits live **only in
+  that browser tab's memory**. Nothing is uploaded, and none of it is saved
+  to localStorage, sessionStorage, IndexedDB, cookies or anywhere else.
+  Refreshing or closing the tab erases it (the page warns you first if there
+  are unsaved edits).
+- The XML is parsed in the browser with the built-in `DOMParser`. There's no
+  backend.
+- Data leaves the page only when you click a copy or download button.
+  Downloads are generated locally as Blobs.
+- The preview iframe is sandboxed without scripts, so any script inside an
+  imported email body can't run.
+- Things that *don't* involve imported data: the page loads Montserrat/Lora
+  from Google Fonts, and an imported email body's own remote `<img>` URLs
+  (if any) load in the preview just as they would in a mail client. TinyMCE
+  (Composer tab only) keeps two empty color-picker entries in localStorage.
+- `.gitignore` ignores `*.xml` everywhere except `fixtures/`, so a real
+  export can't be committed by accident. Keep real exports out of the repo
+  folder anyway.
+
+### Exporting XML from ServiceNow
+
+For each table you need, open its list, filter it, then right-click any
+column header → **Export → XML**:
+
+| What | Table (list URL) |
+| --- | --- |
+| Notifications | `sysevent_email_action.list` |
+| Email templates | `sysevent_email_template.list` |
+| Email (mail) scripts | `sys_script_email.list` |
+| Email layouts | `sys_email_layout.list` |
+
+Only notifications are required. Import the others too so previews show the
+template body, layout and mail script source; anything missing is labelled
+"(not in imported files)". You can drop several files at once. A record
+with the same sys_id in a later file replaces the earlier one.
+
+### End-to-end workflow
+
+1. **Export** the program's notifications (plus their templates, mail
+   scripts and layouts) as XML from ServiceNow.
+2. **Preview**: open this tool, go to **ServiceNow import**, drop the files.
+   Check the summaries; adjust sample data if needed.
+3. **Paste to Google**: per notification, **Copy for Google Docs** → paste
+   into its tab in the program's Doc. **Copy inventory for Google Sheets** →
+   paste into the inventory sheet (or import the CSV).
+4. **Owners comment** on wording in the Doc.
+5. **Apply approved changes**: re-import the XML, turn on **Advanced**, and
+   edit `subject` / `message_html` on the notification or template.
+6. **Download updated XML**, one file per edited record.
+7. **Import to DEV**: in the DEV instance, open the matching list and
+   right-click a column header → **Import XML**, with your update set
+   selected. Test the notification there.
+8. **Update set**: move the change through your normal update set process.
+   ServiceNow stays the source of truth.
+
+### Round-trip guarantees
+
+The downloaded XML is built from the **original bytes** of that record, not
+a re-serialization:
+
+- every field, attribute and sys_id is copied verbatim; only the `subject`
+  and/or `message_html` elements you changed are rewritten (CDATA is kept if
+  the original used it)
+- `sys_updated_on` and `sys_mod_count` are never touched. ServiceNow sets
+  them on import.
+- the only normalization is the file wrapper: the XML declaration, the
+  original `<unload ...>` start tag, the record and `</unload>` each go on
+  their own line (LF), with a trailing newline
+
+`tests/sn-core.test.js` checks that an unedited record comes back
+byte-identical under exactly that normalization, including CRLF files.
+
+### Tests
+
+```bash
+node --test tests/*.test.js
+```
+
+The tests use Node's built-in runner only, with no packages to install. If you edit
+the fixture XML, regenerate the demo copy with
+`node scripts/build-demo-data.js`. A test fails if the two drift apart.
 
 ## Run it locally
 
@@ -43,6 +175,10 @@ python -m http.server 8000
 
 If `fetch` fails for any reason, the app falls back to one built-in sample
 template so it still works.
+
+The **ServiceNow import** tab doesn't need a server. It uses no `fetch`, and
+the demo data ships as a plain script, so opening `index.html` from a
+downloaded copy of the repo works.
 
 ## Adding your own layouts
 
@@ -167,7 +303,15 @@ real exports as they become available.
 
 - `index.html` — layout and form fields
 - `style.css` — styling
-- `app.js` — live preview logic, template loading, copy/download
+- `app.js` — Composer tab: live preview logic, template loading, copy/download
+- `servicenow.js` — ServiceNow import tab (UI, in-memory state)
+- `sn-core.js` — DOM-free XML scanning, field replacement, condition
+  translation, summaries and CSV (shared by the browser and the tests)
+- `docs-export.js` — clipboard (rich HTML for Google Docs), image embedding
+  and local downloads
+- `fixtures/` — fake ServiceNow XML for tests and the demo
+  (`demo-data.js` is generated from it)
+- `tests/` — `node --test` unit tests
 - `config/templates.json` — editable list of starter templates/layouts
 - `vendor/tinymce/` — self-hosted TinyMCE Community edition (GPL) powering
   the Body field's rich text editor
