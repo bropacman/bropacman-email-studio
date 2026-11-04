@@ -257,3 +257,14 @@ test("index.html is stamped with the current build version", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.deepEqual(V.stampedVersions(html), [V.computeVersion()], "run: node scripts/stamp-version.js");
 });
+
+test("cover page helpers: export date and safe links", () => {
+  assert.equal(C.parseUnloadDate('<unload unload_date="2026-11-04 01:46:40">'), "2026-11-04 01:46:40");
+  assert.equal(C.parseUnloadDate("<unload>"), "");
+  assert.equal(C.safeHttpUrl("https://docs.google.com/document/d/abc"), "https://docs.google.com/document/d/abc");
+  assert.equal(C.safeHttpUrl("docs.google.com/spreadsheets/d/x"), "https://docs.google.com/spreadsheets/d/x");
+  assert.equal(C.safeHttpUrl("javascript:alert(1)"), null);
+  assert.equal(C.safeHttpUrl("data:text/html,hi"), null);
+  assert.equal(C.safeHttpUrl("not a link"), null);
+  assert.equal(C.safeHttpUrl(""), null);
+});

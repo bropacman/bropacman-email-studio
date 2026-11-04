@@ -65,8 +65,8 @@ notification into something a process owner can read and comment on:
 
   Variables show by name (as `${opened_for.first_name}` chips), so readers
   learn what each one is. Untick "Show ${variable} names" to get sample
-  values instead. Meanings are kept in memory and included in the sample
-  data JSON export/import, so you can write them once and reload them. By
+  values instead. Meanings are kept in memory and saved with the settings
+  JSON (see below), so you can write them once and reload them. By
   default the email uses a **simplified layout**: all of the layout's text is
   kept, but the shape is flattened so the Doc isn't distorted. The rows
   above the body become one plain colored banner. The row holding
@@ -79,6 +79,25 @@ notification into something a process owner can read and comment on:
   `calc()` font sizes (this also applies to the Composer tab's Docs copy).
   Images become a `[Logo]` label, both in the Doc and wherever a relative
   image URL can't load in the preview.
+- **Program cover page** (sidebar, under the exports): pick a category in
+  the filter, then **Copy cover page for Google Docs** and paste it into
+  the program Doc's first tab. It has:
+  - a summary table: program, process owner group, links to the strategy
+    doc and inventory sheet, the notification count (total / active /
+    inactive / with custom script logic), and the export date
+  - "About this program" (strategy and description) and "How to review",
+    which comes with default text you can edit
+  - a numbered list of the category's notifications (when each sends,
+    active, last updated), in the order to arrange the Doc's tabs
+
+  ServiceNow doesn't hold the description, owner group or links, so you
+  type them per category. Only http(s) links are used; anything else is
+  shown as text.
+- **Settings JSON**: **Export / Import settings JSON** saves everything
+  you've typed (sample values, variable meanings and every program's cover
+  fields) to one file you keep, so the next session starts where you left
+  off. Nothing is saved automatically. The older sample-data-only JSON
+  still imports.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
   per notification in the current filter (name, category, table, trigger
   summary, recipients summary, active, has advanced condition, uses mail
@@ -143,8 +162,11 @@ with the same sys_id in a later file replaces the earlier one.
    scripts and layouts) as XML from ServiceNow.
 2. **Preview**: open this tool, go to **ServiceNow import**, drop the files.
    Check the summaries; adjust sample data if needed.
-3. **Paste to Google**: per notification, **Copy for Google Docs** → paste
-   into its tab in the program's Doc. **Copy inventory for Google Sheets** →
+3. **Paste to Google**: import your settings JSON if you have one. Filter
+   to the program's category, then **Copy cover page for Google Docs** →
+   paste it into the Doc's first tab. Then for each notification,
+   **Copy for Google Docs** → paste into its own tab, in the cover's
+   order. **Copy inventory for Google Sheets** →
    paste into the inventory sheet (or import the CSV).
 4. **Owners comment** on wording in the Doc.
 5. **Apply approved changes**: re-import the XML, turn on **Advanced**, and
