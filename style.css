@@ -639,6 +639,15 @@ body.editor-fullscreen-active { overflow: hidden; }
 
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.sn-cover { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; font-size: 12px; }
+.sn-cover summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.sn-cover[open] summary { margin-bottom: 8px; }
+.sn-cover p { margin: 6px 0; }
+.sn-cover-title { font-weight: 700; font-size: 13px; }
+.sn-cover #snCopyProgram,
+.sn-cover #snCopyCover { width: 100%; margin-bottom: 4px; }
+.sn-cover-status { display: block; }
+
 .sn-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
 .sn-detail { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -705,7 +714,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sn-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
 .sn-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
-.sn-field textarea { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; font-weight: 400; resize: vertical; }
+.sn-field textarea { font-size: 12px; font-weight: 400; resize: vertical; line-height: 1.45; }
+.sn-field textarea.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 
 .sn-preview-actions {
   display: flex;

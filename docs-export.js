@@ -208,6 +208,19 @@
     return rootEl.innerHTML;
   }
 
+  // A value cell: plain text, or { href, text } for a link (href must
+  // already be a vetted http(s) URL).
+  function cellValue(v) {
+    if (v && typeof v === "object" && v.href) {
+      return `<a href="${escapeHtml(v.href)}" style="color:#1a4fb5;">${escapeHtml(v.text || v.href)}</a>`;
+    }
+    return escapeHtml(v).replace(/\n/g, "<br>");
+  }
+
+  function cellText(v) {
+    return v && typeof v === "object" && v.href ? `${v.text || v.href} (${v.href})` : String(v == null ? "" : v);
+  }
+
   // Small two-column table (label | value) - Google Docs keeps simple
   // bordered tables with inline styles intact.
   function headerTable(rows) {
@@ -218,15 +231,17 @@
         .map(
           ([label, value]) =>
             `<tr><td style="${cell}background-color:#f6f7f9;font-weight:bold;width:20%;white-space:nowrap;" bgcolor="#f6f7f9">${escapeHtml(label)}</td>` +
-            `<td style="${cell}">${escapeHtml(value).replace(/\n/g, "<br>")}</td></tr>`
+            `<td style="${cell}">${cellValue(value)}</td></tr>`
         )
         .join("") +
       "</table>"
     );
   }
 
-  // Compact table with a header row - used for the Variables list.
-  function gridTable(headers, rows) {
+  // Compact table with a header row (Variables list, cover page list).
+  // opts.codeFirstColumn styles the first column as code (variable names).
+  function gridTable(headers, rows, opts) {
+    const codeFirst = !!(opts && opts.codeFirstColumn);
     const cell = "border:1px solid #dde3ea;padding:2pt 5pt;vertical-align:top;font-family:Arial,sans-serif;font-size:8.5pt;color:#3c4656;";
     const head = headers
       .map((x) => `<td style="${cell}background-color:#f6f7f9;font-weight:bold;" bgcolor="#f6f7f9">${escapeHtml(x)}</td>`)
@@ -236,7 +251,7 @@
         (r) =>
           "<tr>" +
           r
-            .map((v, i) => `<td style="${cell}${i === 0 ? "font-family:Consolas,'Courier New',monospace;color:#1a4fb5;white-space:nowrap;" : ""}">${escapeHtml(v)}</td>`)
+            .map((v, i) => `<td style="${cell}${codeFirst && i === 0 ? "font-family:Consolas,'Courier New',monospace;color:#1a4fb5;white-space:nowrap;" : ""}">${escapeHtml(v)}</td>`)
             .join("") +
           "</tr>"
       )
@@ -260,5 +275,5 @@
     return (doc.body.innerText || doc.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  root.DocsExport = { escapeHtml, copyRich, copyText, download, prepareForDocs, headerTable, gridTable, bannerTable, htmlToText };
+  root.DocsExport = { escapeHtml, copyRich, copyText, download, prepareForDocs, headerTable, gridTable, bannerTable, htmlToText, cellText };
 })(window);

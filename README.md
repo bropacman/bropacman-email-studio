@@ -65,8 +65,8 @@ notification into something a process owner can read and comment on:
 
   Variables show by name (as `${opened_for.first_name}` chips), so readers
   learn what each one is. Untick "Show ${variable} names" to get sample
-  values instead. Meanings are kept in memory and included in the sample
-  data JSON export/import, so you can write them once and reload them. By
+  values instead. Meanings are kept in memory and saved with the settings
+  JSON (see below), so you can write them once and reload them. By
   default the email uses a **simplified layout**: all of the layout's text is
   kept, but the shape is flattened so the Doc isn't distorted. The rows
   above the body become one plain colored banner. The row holding
@@ -79,6 +79,36 @@ notification into something a process owner can read and comment on:
   `calc()` font sizes (this also applies to the Composer tab's Docs copy).
   Images become a `[Logo]` label, both in the Doc and wherever a relative
   image URL can't load in the preview.
+- **Program Doc** (sidebar, under the exports): one Google Doc per
+  program, on a single page. Headings replace tabs, because Docs tab names
+  cut off early. Pick a category in the filter, then **Copy whole program
+  for Google Docs** and paste into an empty Doc. It contains:
+  - the **cover**: the program title (Heading 1) and a summary table
+    (program, process owner group, links to the strategy doc and inventory
+    sheet, the notification count (total / active / inactive / with custom
+    script logic), and the export date). Then "About this program"
+    (strategy and description), "How to review" (default text you can
+    edit), and a numbered list of the category's notifications.
+  - **every notification** in that order, each under a numbered Heading 2
+    ("1. HR Case opened…") with its tables and email. They're separated by
+    a **divider line** (the default, which works in pageless Docs) or a
+    **page break** (for paged or printed Docs).
+
+  The Doc's outline then lists every notification at full length. For
+  clickable links, put the cursor on the cover's tip line and use
+  **Insert → Table of contents**. Pasted content can't create Docs
+  bookmarks or heading links itself. **Copy cover page only** and each
+  notification's own **Copy for Google Docs** (which includes its heading)
+  are there for re-pasting one updated piece.
+
+  ServiceNow doesn't hold the description, owner group or links, so you
+  type them per category. Only http(s) links are used; anything else is
+  shown as text.
+- **Settings JSON**: **Export / Import settings JSON** saves everything
+  you've typed (sample values, variable meanings and every program's cover
+  fields) to one file you keep, so the next session starts where you left
+  off. Nothing is saved automatically. The older sample-data-only JSON
+  still imports.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
   per notification in the current filter (name, category, table, trigger
   summary, recipients summary, active, has advanced condition, uses mail
@@ -143,8 +173,10 @@ with the same sys_id in a later file replaces the earlier one.
    scripts and layouts) as XML from ServiceNow.
 2. **Preview**: open this tool, go to **ServiceNow import**, drop the files.
    Check the summaries; adjust sample data if needed.
-3. **Paste to Google**: per notification, **Copy for Google Docs** → paste
-   into its tab in the program's Doc. **Copy inventory for Google Sheets** →
+3. **Paste to Google**: import your settings JSON if you have one. Filter
+   to the program's category, then **Copy whole program for Google Docs** →
+   paste into the program's Doc (pageless works well), and optionally
+   insert a table of contents. **Copy inventory for Google Sheets** →
    paste into the inventory sheet (or import the CSV).
 4. **Owners comment** on wording in the Doc.
 5. **Apply approved changes**: re-import the XML, turn on **Advanced**, and

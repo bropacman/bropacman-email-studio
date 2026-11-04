@@ -523,6 +523,26 @@
   }
 
   // ---------------------------------------------------------------------
+  // Small helpers for the program cover page
+  // ---------------------------------------------------------------------
+
+  // <unload unload_date="2026-11-04 01:46:40"> -> "2026-11-04 01:46:40"
+  function parseUnloadDate(unloadOpenTag) {
+    const m = /\sunload_date\s*=\s*"([^"]*)"/.exec(unloadOpenTag || "");
+    return m ? m[1] : "";
+  }
+
+  // Only plain http(s) links go into a Doc; anything else (javascript:,
+  // data:, typos) is rejected. Bare hosts get https:// added.
+  function safeHttpUrl(v) {
+    const t = String(v || "").trim();
+    if (!t) return null;
+    const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : "https://" + t;
+    if (!/^https?:\/\/[^\s/]+\.[^\s]+/i.test(withScheme) || /\s/.test(withScheme)) return null;
+    return withScheme;
+  }
+
+  // ---------------------------------------------------------------------
   // CSV / TSV
   // ---------------------------------------------------------------------
 
@@ -569,6 +589,8 @@
     fillHtml,
     fillText,
     isRelativeUrl,
+    parseUnloadDate,
+    safeHttpUrl,
     imagesToPlaceholder,
     IMAGE_PLACEHOLDER,
     toCsv,

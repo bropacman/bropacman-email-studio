@@ -34,6 +34,7 @@
     scriptsByName: new Map(),
     sample: {}, // variable -> sample value
     meanings: {}, // variable -> plain-English meaning the user typed in
+    programs: {}, // category -> { description, ownerGroup, strategyUrl, inventoryUrl, reviewText } for cover pages
     edits: {}, // sys_id -> { subject?, message_html? }
     selected: null,
     advanced: false,
@@ -66,6 +67,21 @@
     copyDocs: $("snCopyDocs"),
     docsContent: $("snDocsContent"),
     docsShowNames: $("snDocsShowNames"),
+    coverHint: $("snCoverHint"),
+    coverFields: $("snCoverFields"),
+    coverTitle: $("snCoverTitle"),
+    coverDesc: $("snCoverDesc"),
+    coverOwner: $("snCoverOwner"),
+    coverStrategy: $("snCoverStrategy"),
+    coverInventory: $("snCoverInventory"),
+    coverReview: $("snCoverReview"),
+    coverLinkStatus: $("snCoverLinkStatus"),
+    copyCover: $("snCopyCover"),
+    copyProgram: $("snCopyProgram"),
+    programSeparator: $("snProgramSeparator"),
+    exportSettings: $("snExportSettings"),
+    importSettings: $("snImportSettings"),
+    importSettingsInput: $("snImportSettingsInput"),
     pvFrom: $("sn-pv-from"),
     pvTo: $("sn-pv-to"),
     pvSubject: $("sn-pv-subject"),
@@ -122,7 +138,7 @@
 
   function importText(name, text) {
     const u = C.splitUnload(text);
-    const fileIdx = S.files.push({ name, decl: u.decl, unloadOpenTag: u.unloadOpenTag }) - 1;
+    const fileIdx = S.files.push({ name, decl: u.decl, unloadOpenTag: u.unloadOpenTag, unloadDate: C.parseUnloadDate(u.unloadOpenTag) }) - 1;
     const counts = { notifications: 0, templates: 0, scripts: 0, layouts: 0, skipped: 0 };
     for (const r of u.records) {
       const kind = TABLES[r.table];
@@ -178,6 +194,7 @@
     }
     renderList();
     renderSelected();
+    updateCoverPanel(true);
   }
 
   els.fileInput.addEventListener("change", (e) => {
@@ -378,6 +395,7 @@
   }
 
   [els.search, els.fCategory, els.fTable, els.fActive].forEach((el) => el.addEventListener("input", renderList));
+  els.fCategory.addEventListener("input", () => updateCoverPanel());
 
   // ------------------------------------------------------------------
   // Detail panel
@@ -499,18 +517,7 @@
         const file = ev.target.files[0];
         ev.target.value = "";
         if (!file) return;
-        try {
-          const data = JSON.parse(await file.text());
-          if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
-          // Current format: { values: {...}, meanings: {...} }. A flat
-          // { variable: value } object (the earlier format) also works.
-          const isNew = data.values || data.meanings;
-          Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
-          Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
-          renderSelected();
-        } catch (err) {
-          alert("Could not read sample data: " + err.message);
-        }
+        await importSettingsFile(file);
       },
     });
     return section(
@@ -526,8 +533,8 @@
       h(
         "div",
         { class: "sn-buttons" },
-        h("button", { type: "button", class: "secondary", onclick: () => D.download("sample-data.json", JSON.stringify({ values: S.sample, meanings: S.meanings }, null, 2) + "\n", "application/json") }, "Export sample data JSON"),
-        h("button", { type: "button", class: "secondary", onclick: () => importInput.click() }, "Import sample data JSON"),
+        h("button", { type: "button", class: "secondary", onclick: exportSettingsFile }, "Export settings JSON"),
+        h("button", { type: "button", class: "secondary", onclick: () => importInput.click() }, "Import settings JSON"),
         h(
           "button",
           {
@@ -543,6 +550,36 @@
         importInput
       )
     );
+  }
+
+  // Settings JSON: sample values, variable meanings and program cover
+  // fields - the things worth typing once and reloading next session.
+  // Format: { values, meanings, programs }. A flat { variable: value }
+  // object (the first sample-data format) still imports.
+  function exportSettingsFile() {
+    const data = { values: S.sample, meanings: S.meanings, programs: S.programs };
+    D.download("email-studio-settings.json", JSON.stringify(data, null, 2) + "\n", "application/json");
+  }
+
+  async function importSettingsFile(file) {
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
+      const isNew = data.values || data.meanings || data.programs;
+      Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
+      Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
+      Object.entries(isNew ? data.programs || {} : {}).forEach(([cat, p]) => {
+        if (!p || typeof p !== "object") return;
+        const target = programFor(cat);
+        COVER_FIELDS.forEach((k) => {
+          if (p[k] != null) target[k] = String(p[k]);
+        });
+      });
+      renderSelected();
+      updateCoverPanel(true);
+    } catch (err) {
+      alert("Could not read settings: " + err.message);
+    }
   }
 
   function mailScriptSection(n) {
@@ -794,9 +831,25 @@
     return bits.length ? bits.join("; ") : "(none configured)";
   }
 
-  els.copyDocs.addEventListener("click", async () => {
-    const n = S.selected ? S.notifications.get(S.selected) : null;
-    if (!n) return;
+  // Docs styling shared by the notification copy and the program copy.
+  const DOCS_FONT = "font-family:Arial,Helvetica,sans-serif;color:#1c2430;";
+  const DOCS_BODY = DOCS_FONT + "font-size:10.5pt;line-height:1.45;margin:0 0 6pt 0;";
+  // A real Docs heading (shows in the outline and in Insert > Table of
+  // contents), one per notification.
+  const notificationHeading = (title) =>
+    `<h2 style="${DOCS_FONT}font-size:15pt;font-weight:bold;margin:0 0 6pt 0;">${D.escapeHtml(title)}</h2>`;
+  // Between notifications in a whole-program copy. A divider line works in
+  // pageless Docs (which hide page breaks); a Word-style page break, which
+  // Google Docs turns into a real page break on paste, suits paged/printed
+  // Docs.
+  const SEPARATORS = {
+    divider: '<p style="margin:0;">&nbsp;</p><hr style="border:0;border-top:2px solid #c7ced9;margin:6pt 0 12pt 0;">',
+    pagebreak: '<br clear="all" style="page-break-before:always">',
+  };
+
+  // Everything for one notification in a review Doc: its heading, the small
+  // config table, the Variables table, From/To/Subject, and the email.
+  async function notificationDocs(n, title) {
     const e = effective(n);
     const showNames = els.docsShowNames.checked;
     const subject = showNames ? C.fillText(e.subject, null) : C.fillText(e.subject, S.sample);
@@ -818,16 +871,25 @@
     // Every ${variable} the email uses, with its meaning and example value.
     const { variables } = C.findVariables(e.subject + "\n" + e.body + "\n" + e.layoutHtml);
     const varRows = variables.map((v) => ["${" + v + "}", S.meanings[v] || "", S.sample[v] != null ? S.sample[v] : C.defaultSampleValue(v)]);
-    const varTable = varRows.length ? D.gridTable(["Variable", "Meaning", "Example"], varRows) : "";
-    const html = D.headerTable(rows) + varTable + D.headerTable(emailHead) + email;
+    const varTable = varRows.length ? D.gridTable(["Variable", "Meaning", "Example"], varRows, { codeFirstColumn: true }) : "";
+    const html = notificationHeading(title) + D.headerTable(rows) + varTable + D.headerTable(emailHead) + email;
     const kvText = (list) => list.map(([k, v]) => `${k}: ${v}`).join("\n");
     const text =
+      title +
+      "\n\n" +
       kvText(rows) +
       (varRows.length ? "\n\nVariables:\n" + varRows.map(([v, m, x]) => `${v}${m ? " - " + m : ""} (e.g. ${x})`).join("\n") : "") +
       "\n\n" +
       kvText(emailHead) +
       "\n\n" +
       D.htmlToText(email);
+    return { html, text };
+  }
+
+  els.copyDocs.addEventListener("click", async () => {
+    const n = S.selected ? S.notifications.get(S.selected) : null;
+    if (!n) return;
+    const { html, text } = await notificationDocs(n, n.f.name || n.sysId);
     flash(els.copyDocs, (await D.copyRich(html, text)) ? "Copied! Paste into Google Docs" : "Copy failed");
   });
 
@@ -974,6 +1036,197 @@
     const xml = C.buildUnloadXml(file.decl, file.unloadOpenTag, [raw]);
     D.download(`${rec.table}_${rec.sysId}.xml`, xml, "application/xml");
   }
+
+
+  // ------------------------------------------------------------------
+  // Program cover page (first tab of each program's Google Doc)
+  //
+  // Facts come from the imported XML (category, counts, notification list,
+  // export date). What ServiceNow doesn't hold - the strategy/description,
+  // process owner group, links and review instructions - is typed in here,
+  // kept in memory per category, and saved with the settings JSON.
+  // ------------------------------------------------------------------
+
+  const DEFAULT_REVIEW_TEXT =
+    "Each notification below has its own numbered heading, in the order listed. Use the document " +
+    "outline (or the table of contents) to jump between them. Please review the wording and add comments rather than " +
+    "editing the text directly. ${variable} chips are filled in by ServiceNow when the email is sent (see each " +
+    "notification's Variables table), and [Dynamic content] boxes are generated by scripts. Approved changes are made in " +
+    "ServiceNow and moved to production through the normal release process.";
+  // Default from the first (one-tab-per-notification) version; programs
+  // still holding it untouched get the new default.
+  const OLD_DEFAULT_REVIEW_TEXT =
+    "Each tab after this one is one notification, in the order listed below. Please review the wording and add comments " +
+    "rather than editing the text directly. ${variable} chips are filled in by ServiceNow when the email is sent (see each " +
+    "tab's Variables table), and [Dynamic content] boxes are generated by scripts. Approved changes are made in ServiceNow " +
+    "and moved to production through the normal release process.";
+
+  const COVER_FIELDS = ["description", "ownerGroup", "strategyUrl", "inventoryUrl", "reviewText"];
+  let coverCategory = null;
+
+  function programFor(cat) {
+    const p = (S.programs[cat] = S.programs[cat] || { reviewText: DEFAULT_REVIEW_TEXT });
+    if (p.reviewText === OLD_DEFAULT_REVIEW_TEXT) p.reviewText = DEFAULT_REVIEW_TEXT;
+    return p;
+  }
+
+  function coverInputs() {
+    return {
+      description: els.coverDesc,
+      ownerGroup: els.coverOwner,
+      strategyUrl: els.coverStrategy,
+      inventoryUrl: els.coverInventory,
+      reviewText: els.coverReview,
+    };
+  }
+
+  // Shows the fields for the category picked in the filter.
+  function updateCoverPanel(force) {
+    const cat = els.fCategory.value;
+    if (!force && cat === coverCategory) return;
+    coverCategory = cat;
+    els.coverHint.hidden = !!cat;
+    els.coverFields.hidden = !cat;
+    if (!cat) return;
+    els.coverTitle.textContent = cat;
+    const p = programFor(cat);
+    const inputs = coverInputs();
+    COVER_FIELDS.forEach((k) => (inputs[k].value = p[k] || ""));
+    els.coverLinkStatus.textContent = "";
+  }
+
+  Object.entries({
+    description: "coverDesc",
+    ownerGroup: "coverOwner",
+    strategyUrl: "coverStrategy",
+    inventoryUrl: "coverInventory",
+    reviewText: "coverReview",
+  }).forEach(([key, el]) =>
+    els[el].addEventListener("input", () => {
+      if (!coverCategory) return;
+      programFor(coverCategory)[key] = els[el].value;
+    })
+  );
+
+  function linkCell(raw, label) {
+    if (!String(raw || "").trim()) return "(not set)";
+    const href = C.safeHttpUrl(raw);
+    return href ? { href, text: label } : `(invalid link: ${raw})`;
+  }
+
+  function coverData(cat) {
+    const items = [...S.notifications.values()]
+      .filter((n) => categoryLabel(n) === cat)
+      .sort((a, b) => (a.f.name || "").localeCompare(b.f.name || ""));
+    const active = items.filter((n) => C.isTrue(n.f.active)).length;
+    const scripted = items.filter((n) => C.hasAdvancedCondition(n.f)).length;
+    const exported = [...new Set(items.map((n) => (S.files[n.fileIdx] || {}).unloadDate).filter(Boolean))].sort();
+    const p = programFor(cat);
+    const summary = [
+      ["Program", cat],
+      ["Process owner group", (p.ownerGroup || "").trim() || "(not set)"],
+      ["Strategy", linkCell(p.strategyUrl, "Strategy and description")],
+      ["Inventory sheet", linkCell(p.inventoryUrl, "Notification inventory")],
+      [
+        "Notifications",
+        `${items.length} total: ${active} active, ${items.length - active} inactive` +
+          (scripted ? `; ${scripted} with custom script logic (ask HRIT)` : ""),
+      ],
+      ["Exported from ServiceNow", exported.length ? exported.join(", ") : "(unknown)"],
+    ];
+    const list = items.map((n, i) => [
+      String(i + 1),
+      n.f.name || n.sysId,
+      C.triggerSummary(n.f, n.conditionDisplay),
+      C.isTrue(n.f.active) ? "Yes" : "No",
+      n.f.sys_updated_on || "",
+    ]);
+    return { items, summary, list, p };
+  }
+
+  function paragraphs(text, style) {
+    return String(text || "")
+      .split(/\n\s*\n/)
+      .map((para) => para.trim())
+      .filter(Boolean)
+      .map((para) => `<p style="${style}">${D.escapeHtml(para).replace(/\n/g, "<br>")}</p>`)
+      .join("");
+  }
+
+  // The cover. Only the program title is a heading; the cover's own
+  // sections are bold paragraphs, so the Doc outline reads
+  // "Program > 1. Notification > 2. Notification ..." and nothing else.
+  function coverDocs(cat) {
+    const { items, summary, list, p } = coverData(cat);
+    const bad = ["strategyUrl", "inventoryUrl"].filter((k) => String(p[k] || "").trim() && !C.safeHttpUrl(p[k]));
+    els.coverLinkStatus.textContent = bad.length ? "One of the links isn't a valid http(s) URL; it's shown as text." : "";
+    const h1 = `<h1 style="${DOCS_FONT}font-size:18pt;margin:0 0 4pt 0;">${D.escapeHtml(cat)}: notification review</h1>`;
+    const sectionTitle = (t) => `<p style="${DOCS_FONT}font-size:12pt;font-weight:bold;margin:14pt 0 4pt 0;">${D.escapeHtml(t)}</p>`;
+    const tocTip =
+      `<p style="${DOCS_FONT}font-size:9pt;font-style:italic;color:#6b7688;margin:0 0 6pt 0;">` +
+      "Tip: put the cursor on this line and use Insert &gt; Table of contents for clickable links to every notification.</p>";
+    const html =
+      h1 +
+      D.headerTable(summary) +
+      tocTip +
+      sectionTitle("About this program") +
+      (paragraphs(p.description, DOCS_BODY) || `<p style="${DOCS_BODY}color:#6b7688;">(No description yet.)</p>`) +
+      sectionTitle("How to review") +
+      paragraphs(p.reviewText || DEFAULT_REVIEW_TEXT, DOCS_BODY) +
+      sectionTitle("Notifications") +
+      D.gridTable(["#", "Notification", "When it sends", "Active", "Last updated"], list);
+    const text =
+      `${cat}: notification review\n\n` +
+      summary.map(([k, v]) => `${k}: ${D.cellText(v)}`).join("\n") +
+      `\n\nAbout this program\n${(p.description || "(No description yet.)").trim()}` +
+      `\n\nHow to review\n${(p.reviewText || DEFAULT_REVIEW_TEXT).trim()}` +
+      "\n\nNotifications\n" +
+      list.map(([i, name, when, active, updated]) => `${i}. ${name} - ${when} - active: ${active} - updated ${updated}`).join("\n");
+    return { html, text, items };
+  }
+
+  els.copyCover.addEventListener("click", async () => {
+    if (!coverCategory) return;
+    const { html, text } = coverDocs(coverCategory);
+    flash(els.copyCover, (await D.copyRich(html, text)) ? "Copied! Paste at the top of the Doc" : "Copy failed");
+  });
+
+  // The whole program as one Doc: cover, then every notification of the
+  // category under a numbered heading (same numbering and order as the
+  // cover's list), separated by a divider line or a page break.
+  els.copyProgram.addEventListener("click", async () => {
+    const cat = coverCategory;
+    if (!cat) return;
+    const original = els.copyProgram.textContent;
+    els.copyProgram.disabled = true;
+    els.copyProgram.textContent = "Building...";
+    try {
+      const cover = coverDocs(cat);
+      const parts = [cover.html];
+      const texts = [cover.text];
+      for (const [i, n] of cover.items.entries()) {
+        const one = await notificationDocs(n, `${i + 1}. ${n.f.name || n.sysId}`);
+        parts.push((SEPARATORS[els.programSeparator.value] || SEPARATORS.divider) + one.html);
+        texts.push(one.text);
+      }
+      const ok = await D.copyRich(parts.join("\n"), texts.join("\n\n----------\n\n"));
+      els.copyProgram.textContent = original;
+      els.copyProgram.disabled = false;
+      flash(els.copyProgram, ok ? `Copied cover + ${cover.items.length} notifications` : "Copy failed");
+    } catch (err) {
+      els.copyProgram.textContent = original;
+      els.copyProgram.disabled = false;
+      alert("Could not build the program copy: " + err.message);
+    }
+  });
+
+  els.exportSettings.addEventListener("click", exportSettingsFile);
+  els.importSettings.addEventListener("click", () => els.importSettingsInput.click());
+  els.importSettingsInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file) await importSettingsFile(file);
+  });
 
   window.addEventListener("beforeunload", (e) => {
     if (Object.keys(S.edits).length) {
