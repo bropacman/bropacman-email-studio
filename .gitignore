@@ -1,0 +1,6 @@
+# ServiceNow exports contain real instance data - never commit them.
+# Only the fake demo/test fixtures under fixtures/ are allowed.
+*.xml
+!fixtures/**/*.xml
+
+node_modules/
