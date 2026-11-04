@@ -668,6 +668,105 @@
     return rows.map((r) => r.map((v) => guardFormula(v).replace(/[\t\r\n]+/g, " ")).join("\t")).join("\n") + "\n";
   }
 
+  // RFC 4180-style CSV parser: quoted fields, "" escapes, newlines inside
+  // quotes, CRLF or LF, optional BOM. Tab-separated text (a copied range)
+  // is accepted too when the first line has tabs and no commas.
+  function parseCsv(text) {
+    const src = String(text || "").replace(/^﻿/, "");
+    const firstLine = src.split(/\r?\n/, 1)[0];
+    const sep = firstLine.includes("\t") && !firstLine.includes(",") ? "\t" : ",";
+    const rows = [];
+    let row = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (src[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else inQuotes = false;
+        } else field += c;
+      } else if (c === '"' && field === "") {
+        inQuotes = true;
+      } else if (c === sep) {
+        row.push(field);
+        field = "";
+      } else if (c === "\n" || c === "\r") {
+        if (c === "\r" && src[i + 1] === "\n") i++;
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+      } else field += c;
+    }
+    if (field !== "" || row.length) {
+      row.push(field);
+      rows.push(row);
+    }
+    return rows.filter((r) => r.some((v) => v.trim() !== ""));
+  }
+
+  // ---------------------------------------------------------------------
+  // Glossary (a tab in the inventory Google Sheet)
+  //
+  // One row per mail script and per ${variable}: what it is and an example.
+  // The tool writes it (copy/CSV) and reads it back from the sheet's
+  // File > Download > CSV.
+  // ---------------------------------------------------------------------
+
+  const GLOSSARY_HEADER = ["Type", "Name", "Meaning / what it does", "Example", "Used by"];
+
+  // Undo guardFormula's leading apostrophe on values that needed it.
+  function unguard(v) {
+    return /^'[=+\-@]/.test(v) ? v.slice(1) : v;
+  }
+
+  // rows: parsed CSV including the header row. Returns
+  // { variables: { name: { meaning, example } }, mailScripts: { name: { description, example } }, skipped }.
+  // Empty cells are left out so they don't wipe out values already typed.
+  function readGlossary(rows) {
+    const out = { variables: {}, mailScripts: {}, skipped: 0 };
+    if (!rows.length) return out;
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const col = (re) => header.findIndex((h) => re.test(h));
+    const iType = col(/^type$/);
+    const iName = col(/^name$/);
+    const iMeaning = col(/meaning|what it does|description/);
+    const iExample = col(/example/);
+    if (iName === -1) throw new Error('No "Name" column found. Expected columns: ' + GLOSSARY_HEADER.join(", "));
+    for (const r of rows.slice(1)) {
+      const cell = (i) => (i >= 0 && r[i] != null ? unguard(String(r[i])).trim() : "");
+      let name = cell(iName);
+      if (!name) {
+        out.skipped++;
+        continue;
+      }
+      const type = cell(iType).toLowerCase();
+      const isVar = /^\$\{.*\}$/.test(name) || (type && /var/.test(type));
+      const isScript = !isVar && (!type || /script/.test(type));
+      if (!isVar && !isScript) {
+        out.skipped++;
+        continue;
+      }
+      name = name.replace(/^\$\{\s*/, "").replace(/\s*\}$/, "").replace(/^mail_script:/i, "").trim();
+      const meaning = cell(iMeaning);
+      const example = cell(iExample);
+      const entry = {};
+      if (isVar) {
+        if (meaning) entry.meaning = meaning;
+        if (example) entry.example = example;
+        if (Object.keys(entry).length) out.variables[name] = entry;
+      } else {
+        if (meaning) entry.description = meaning;
+        if (example) entry.example = example;
+        if (Object.keys(entry).length) out.mailScripts[name] = entry;
+      }
+    }
+    return out;
+  }
+
   return {
     scanChildren,
     splitUnload,
@@ -701,5 +800,8 @@
     IMAGE_PLACEHOLDER,
     toCsv,
     toTsv,
+    parseCsv,
+    readGlossary,
+    GLOSSARY_HEADER,
   };
 });

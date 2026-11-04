@@ -317,3 +317,33 @@ test("summaries can use friendly labels", () => {
   // Without the option, technical names are unchanged.
   assert.match(C.triggerSummary(n), /^sn_hr_core_case: .* transferred_from is empty/);
 });
+
+test("CSV parser handles quotes, embedded newlines, CRLF, BOM and TSV", () => {
+  const csv = '\uFEFF"Type","Name","Meaning / what it does","Example"\r\n"Mail script","sig","Signature, team","Thanks,\nHR ""Team"""\r\n';
+  assert.deepEqual(C.parseCsv(csv), [
+    ["Type", "Name", "Meaning / what it does", "Example"],
+    ["Mail script", "sig", "Signature, team", 'Thanks,\nHR "Team"'],
+  ]);
+  assert.deepEqual(C.parseCsv("a\tb\nc\td\n"), [["a", "b"], ["c", "d"]]);
+  assert.deepEqual(C.parseCsv("a,b\n\n,\n"), [["a", "b"]]);
+});
+
+test("glossary round-trips through CSV and reads back what was typed", () => {
+  const rows = [
+    C.GLOSSARY_HEADER,
+    ["Mail script", "signature_HRcase_bps_cob", "Signature block", "Thanks,\nHR", "14 notifications"],
+    ["Mail script", "headline_cob_notification", "", "", "9 notifications"],
+    ["Variable", "${opened_for.first_name}", "Employee's first name", "Jane", "22 notifications"],
+    ["Variable", "${number}", "", "-5", "3 notifications"],
+    ["", "", "", "", ""],
+  ];
+  const g = C.readGlossary(C.parseCsv(C.toCsv(rows)));
+  assert.deepEqual(g.mailScripts, { signature_HRcase_bps_cob: { description: "Signature block", example: "Thanks,\nHR" } });
+  // The formula guard's apostrophe on "-5" is removed again on import.
+  assert.deepEqual(g.variables, { "opened_for.first_name": { meaning: "Employee's first name", example: "Jane" }, number: { example: "-5" } });
+  // Columns can be reordered or renamed slightly, and Type can be missing.
+  const loose = C.readGlossary([["Name", "Description", "Example"], ["${x}", "An x", "1"], ["my_script", "Does y", ""]]);
+  assert.deepEqual(loose.variables, { x: { meaning: "An x", example: "1" } });
+  assert.deepEqual(loose.mailScripts, { my_script: { description: "Does y" } });
+  assert.throws(() => C.readGlossary([["Foo"], ["bar"]]), /No "Name" column/);
+});

@@ -116,6 +116,26 @@ notification into something a process owner can read and comment on:
   the next session starts where you left
   off. Nothing is saved automatically. The older sample-data-only JSON
   still imports.
+- **Glossary tab** (sidebar): mail script descriptions and variable
+  meanings are stored by name, so a shared script or variable is
+  described once and applies to every notification that uses it. To keep
+  them in the inventory Google Sheet, where the whole team can maintain
+  them:
+  1. **Copy glossary for Google Sheets** → paste into cell A1 of a
+     **Glossary** tab. There's one row per mail script and `${variable}`
+     used across all imported notifications (Type, Name, Meaning / what it
+     does, Example, Used by), with shared scripts listed first, most-used
+     at the top. **Export glossary CSV** gives the same as a file, and
+     keeps line breaks in examples.
+  2. The team fills in the Meaning and Example columns in the sheet.
+  3. Next session: in the sheet, use **File → Download → Comma-separated
+     values** for the Glossary tab, then **Import glossary CSV**, or drop
+     the CSV on the main import box. Empty cells don't overwrite anything
+     already typed. Columns can be reordered.
+
+  The CSV goes from Sheets to your computer to this tab, and nothing
+  connects to Google. A settings JSON dropped on the import box is
+  applied too.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
   per notification in the current filter (name, category, table label,
   table name, trigger summary, recipients summary, active, has advanced

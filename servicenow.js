@@ -63,6 +63,10 @@
     exports: $("snExports"),
     exportCsv: $("snExportCsv"),
     copySheets: $("snCopySheets"),
+    copyGlossary: $("snCopyGlossary"),
+    exportGlossary: $("snExportGlossary"),
+    importGlossary: $("snImportGlossary"),
+    importGlossaryInput: $("snImportGlossaryInput"),
     advancedToggle: $("snAdvancedToggle"),
     detail: $("snDetail"),
     copyDocs: $("snCopyDocs"),
@@ -166,6 +170,15 @@
     if (!files.length) return;
     const lines = [];
     for (const file of files) {
+      // Glossary CSVs and settings JSON can be dropped in the same place.
+      if (/\.(csv|tsv|txt)$/i.test(file.name)) {
+        lines.push(await importGlossaryFile(file));
+        continue;
+      }
+      if (/\.json$/i.test(file.name)) {
+        lines.push(`${file.name}: ${(await importSettingsFile(file)) ? "settings applied" : "could not read settings"}`);
+        continue;
+      }
       try {
         const c = importText(file.name, await file.text());
         lines.push(
@@ -606,8 +619,10 @@
       });
       renderSelected();
       updateCoverPanel(true);
+      return true;
     } catch (err) {
       alert("Could not read settings: " + err.message);
+      return false;
     }
   }
 
@@ -1314,6 +1329,76 @@
     e.target.value = "";
     if (file) await importSettingsFile(file);
   });
+
+  // ------------------------------------------------------------------
+  // Glossary: mail scripts and ${variables} across every imported
+  // notification, for a "Glossary" tab in the inventory Google Sheet.
+  // ------------------------------------------------------------------
+
+  function glossaryRows() {
+    const vars = new Map();
+    const scripts = new Map();
+    S.notifications.forEach((n) => {
+      const e = effective(n);
+      const found = C.findVariables(e.subject + "\n" + e.body + "\n" + e.layoutHtml);
+      found.variables.forEach((v) => vars.set(v, (vars.get(v) || 0) + 1));
+      found.mailScripts.forEach((s) => scripts.set(s, (scripts.get(s) || 0) + 1));
+    });
+    const used = (count) => `${count} notification${count === 1 ? "" : "s"}`;
+    const byUse = (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]);
+    return [
+      C.GLOSSARY_HEADER,
+      ...[...scripts].sort(byUse).map(([name, count]) => {
+        const info = S.scriptInfo[name] || {};
+        return ["Mail script", name, info.description || "", info.example || "", used(count)];
+      }),
+      ...[...vars].sort(byUse).map(([name, count]) => [
+        "Variable",
+        "${" + name + "}",
+        S.meanings[name] || "",
+        S.sample[name] != null ? S.sample[name] : C.defaultSampleValue(name),
+        used(count),
+      ]),
+    ];
+  }
+
+  els.copyGlossary.addEventListener("click", async () => {
+    const rows = glossaryRows();
+    flash(els.copyGlossary, (await D.copyText(C.toTsv(rows))) ? `Copied ${rows.length - 1} rows! Paste into cell A1` : "Copy failed");
+  });
+  els.exportGlossary.addEventListener("click", () =>
+    D.download("notification-glossary.csv", C.toCsv(glossaryRows()), "text/csv;charset=utf-8")
+  );
+  els.importGlossary.addEventListener("click", () => els.importGlossaryInput.click());
+  els.importGlossaryInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (file) setStatus([await importGlossaryFile(file)]);
+  });
+
+  // Applies a glossary CSV: variable meanings + sample values, mail script
+  // descriptions + examples. Returns a status line.
+  async function importGlossaryFile(file) {
+    try {
+      const g = C.readGlossary(C.parseCsv(await file.text()));
+      Object.entries(g.variables).forEach(([name, v]) => {
+        if (v.meaning) S.meanings[name] = v.meaning;
+        if (v.example) S.sample[name] = v.example;
+      });
+      Object.entries(g.mailScripts).forEach(([name, s]) => {
+        const target = scriptInfoFor(name);
+        if (s.description) target.description = s.description;
+        if (s.example) target.example = s.example;
+      });
+      renderSelected();
+      const nv = Object.keys(g.variables).length;
+      const ns = Object.keys(g.mailScripts).length;
+      return `${file.name}: glossary with ${ns} mail script${ns === 1 ? "" : "s"} and ${nv} variable${nv === 1 ? "" : "s"} applied` +
+        (g.skipped ? ` (${g.skipped} rows skipped)` : "");
+    } catch (err) {
+      return `${file.name}: could not read glossary - ${err.message}`;
+    }
+  }
 
   window.addEventListener("beforeunload", (e) => {
     if (Object.keys(S.edits).length) {
