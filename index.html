@@ -8,7 +8,7 @@
      also renders Montserrat/Lora correctly when applied via the editor's
      font picker on a simple (non-layout) template. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:ital,wght@0,400;0,700;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=7485c554">
+<link rel="stylesheet" href="style.css?v=89c15993">
 </head>
 <body>
   <header class="topbar">
@@ -16,7 +16,7 @@
       <div class="brand">
         <span class="brand-mark">ES</span>
         <div>
-          <h1>Bropacman Email Studio <span class="app-version" id="appVersion" title="Changes with every release. If it doesn't change after an update, refresh the page.">build 7485c554</span></h1>
+          <h1>Bropacman Email Studio <span class="app-version" id="appVersion" title="Changes with every release. If it doesn't change after an update, refresh the page.">build 89c15993</span></h1>
           <p>Preview what a notification email will actually look like before it's sent &mdash; no login required.</p>
         </div>
       </div>
@@ -160,6 +160,27 @@
       <div class="sn-exports" id="snExports" hidden>
         <button type="button" id="snExportCsv">Export inventory CSV</button>
         <button type="button" id="snCopySheets" class="secondary">Copy inventory for Google Sheets</button>
+        <details class="sn-cover" id="snCategories">
+          <summary>Categories (HR email content &amp; content delivery)</summary>
+          <p class="muted">
+            HR email content and content delivery records have no category in ServiceNow. Create a new category here
+            (it doesn't have to exist in ServiceNow), then tick records below to put them in it. Saved with the settings JSON.
+          </p>
+          <div class="sn-buttons">
+            <input type="text" id="snNewCategory" class="sn-category-input" placeholder="New category name" aria-label="New category name">
+            <button type="button" id="snCreateCategory">Create category</button>
+          </div>
+          <div class="sn-cat-list" id="snCategoryList"></div>
+          <label class="sn-field">Assign ticked records to
+            <select id="snAssignCategory"></select>
+          </label>
+          <div class="sn-cat-records" id="snCategoryRecords"></div>
+          <div class="sn-buttons">
+            <button type="button" id="snAssignSelected">Assign ticked</button>
+            <button type="button" class="secondary" id="snUnassignSelected">Clear category on ticked</button>
+          </div>
+          <span class="muted sn-cover-status" id="snCategoryStatus" aria-live="polite"></span>
+        </details>
         <details class="sn-cover" id="snGlossary">
           <summary>Glossary tab (mail scripts &amp; variables)</summary>
           <p class="muted">
@@ -252,10 +273,10 @@
   </main>
 
   <script src="vendor/tinymce/tinymce.min.js"></script>
-  <script src="docs-export.js?v=7485c554"></script>
-  <script src="app.js?v=7485c554"></script>
-  <script src="sn-core.js?v=7485c554"></script>
-  <script src="fixtures/demo-data.js?v=7485c554"></script>
-  <script src="servicenow.js?v=7485c554"></script>
+  <script src="docs-export.js?v=89c15993"></script>
+  <script src="app.js?v=89c15993"></script>
+  <script src="sn-core.js?v=89c15993"></script>
+  <script src="fixtures/demo-data.js?v=89c15993"></script>
+  <script src="servicenow.js?v=89c15993"></script>
 </body>
 </html>

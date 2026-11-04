@@ -53,6 +53,14 @@ ServiceNow. Until you assign one, they group under "HR email content" and
 
 - **One at a time:** type a category in the record's **Category** field.
   It suggests your existing notification categories.
+- **Create a new category:** open **Categories** in the export section,
+  type a name and click **Create category**. It doesn't need to exist in
+  ServiceNow. Tick HR email content / content delivery records in the
+  list below it (or **Select all**) and click **Assign ticked**. A created
+  category shows in the category filter right away, even with nothing
+  assigned, so you can fill in its Program Doc cover first. Removing one
+  (the × on its chip) clears it from the records assigned to it. Created
+  categories are saved in the settings JSON.
 - **In bulk:** export the inventory (CSV or copy for Sheets). Unassigned
   HR email content and content delivery rows have an empty **Category**
   cell. Fill those in the sheet, download the tab as CSV, and drop it on
