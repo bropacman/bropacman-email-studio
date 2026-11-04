@@ -462,12 +462,23 @@
     return layoutHtml.split(marker).join(wrapped);
   }
 
+  const VAR_CHIP_STYLE =
+    "background:#e8f0fe;color:#1a4fb5;padding:0 3px;border-radius:3px;font-family:Consolas,'Courier New',monospace;font-size:0.9em;font-style:normal;";
+
+  function variableChip(token) {
+    return `<span style="${VAR_CHIP_STYLE}">${escapeHtml("${" + token + "}")}</span>`;
+  }
+
   // Fills an HTML string: mail scripts -> placeholder boxes, known variables
-  // -> escaped sample values, anything else left visible and highlighted.
-  function fillHtml(html, values) {
+  // -> escaped sample values (or, with opts.showNames, a ${name} chip so
+  // readers learn what each variable is), anything else left visible and
+  // highlighted.
+  function fillHtml(html, values, opts) {
+    const showNames = !!(opts && opts.showNames);
     return (html || "").replace(VAR_RE, (match, token) => {
       const t = token.trim();
       if (/^mail_script:/i.test(t)) return mailScriptPlaceholder(t.slice(12).trim());
+      if (showNames) return variableChip(t);
       if (values && Object.prototype.hasOwnProperty.call(values, t)) return escapeHtml(values[t]);
       return `<span style="${UNKNOWN_VAR_STYLE}" title="Dynamic ServiceNow value">${escapeHtml(match)}</span>`;
     });

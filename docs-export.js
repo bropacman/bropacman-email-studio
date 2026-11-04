@@ -104,6 +104,69 @@
     });
   }
 
+  // Google Docs takes email layout literally: fixed row heights become tall
+  // empty bands, spacer rows/tables become gaps, a background wrapper table
+  // becomes a grey frame, and calc() font sizes are misread. This flattens
+  // all of that while keeping the real structure (banner columns, content,
+  // footer, inner tables) and every piece of text.
+  const isBlank = (el) => !el.querySelector("img") && el.textContent.replace(/[\s ]/g, "") === "";
+
+  function tidyForDocs(root) {
+    // 1. Spacer rows and tables: no text, no images.
+    root.querySelectorAll("tr").forEach((tr) => isBlank(tr) && tr.remove());
+    root.querySelectorAll("table").forEach((t) => isBlank(t) && t.remove());
+
+    // 2. Background wrapper tables: a single cell whose only content is
+    //    another table. Replace the wrapper with what's inside it.
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const t of root.querySelectorAll("table")) {
+        if (t.rows.length !== 1 || t.rows[0].cells.length !== 1) continue;
+        const cell = t.rows[0].cells[0];
+        const kids = [...cell.childNodes].filter(
+          (n) => !(n.nodeType === 3 && !n.nodeValue.trim()) && !(n.nodeType === 1 && n.tagName !== "TABLE" && isBlank(n))
+        );
+        if (kids.length && kids.every((n) => n.nodeType === 1 && n.tagName === "TABLE")) {
+          t.replaceWith(...kids);
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    // 3. Truly empty paragraphs/divs (deliberate &nbsp; spacer paragraphs
+    //    in the body are kept).
+    root.querySelectorAll("p, div").forEach((el) => {
+      if (!el.querySelector("img, table, br") && el.textContent.replace(/[ \t\r\n]/g, "") === "") el.remove();
+    });
+
+    // 4. Sizing: drop fixed heights everywhere, pixel widths and auto
+    //    margins on tables/cells (percentage widths are kept), and turn
+    //    calc() font sizes into their first plain size.
+    root.querySelectorAll("*").forEach((el) => {
+      el.removeAttribute("height");
+      const tableish = /^(TABLE|TD|TH|TR|TBODY)$/.test(el.tagName);
+      if (tableish && /px$|^\d+$/.test(el.getAttribute("width") || "")) el.removeAttribute("width");
+      const style = el.getAttribute("style");
+      if (!style) return;
+      const kept = style
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((s) => !/^(height|min-height|max-height)\s*:/i.test(s))
+        .filter((s) => !(tableish && /^(width|max-width|min-width)\s*:\s*[\d.]+px/i.test(s)))
+        .filter((s) => !/^margin\s*:.*auto/i.test(s))
+        .map((s) => {
+          const m = /^font-size\s*:\s*calc\(\s*([\d.]+(?:px|pt|em|rem))/i.exec(s);
+          return m ? `font-size: ${m[1]}` : s;
+        })
+        .filter((s) => !/^font-size\s*:\s*calc\(/i.test(s));
+      if (kept.length) el.setAttribute("style", kept.join("; "));
+      else el.removeAttribute("style");
+    });
+  }
+
   // Prepares email HTML for a Google Docs paste: drops tags Docs ignores or
   // that could misbehave (<script>, <style>, <link>, <meta>, <base>), embeds
   // same-origin images, and replaces images Docs could never load with a
@@ -113,6 +176,7 @@
     const doc = new DOMParser().parseFromString(`<div id="__root">${html}</div>`, "text/html");
     const rootEl = doc.getElementById("__root");
     rootEl.querySelectorAll("script, style, link, meta, base, iframe, object, embed").forEach((el) => el.remove());
+    tidyForDocs(rootEl);
     const base = document.baseURI;
     await Promise.all(
       [...rootEl.querySelectorAll("img")].map(async (img) => {
@@ -161,6 +225,25 @@
     );
   }
 
+  // Compact table with a header row - used for the Variables list.
+  function gridTable(headers, rows) {
+    const cell = "border:1px solid #dde3ea;padding:2pt 5pt;vertical-align:top;font-family:Arial,sans-serif;font-size:8.5pt;color:#3c4656;";
+    const head = headers
+      .map((x) => `<td style="${cell}background-color:#f6f7f9;font-weight:bold;" bgcolor="#f6f7f9">${escapeHtml(x)}</td>`)
+      .join("");
+    const body = rows
+      .map(
+        (r) =>
+          "<tr>" +
+          r
+            .map((v, i) => `<td style="${cell}${i === 0 ? "font-family:Consolas,'Courier New',monospace;color:#1a4fb5;white-space:nowrap;" : ""}">${escapeHtml(v)}</td>`)
+            .join("") +
+          "</tr>"
+      )
+      .join("");
+    return `<table style="border-collapse:collapse;width:100%;margin:0 0 12pt 0;"><tr>${head}</tr>${body}</table>`;
+  }
+
   // A colored banner as a one-cell table, since Docs drops <div>
   // backgrounds but keeps table cell backgrounds.
   function bannerTable(text, color) {
@@ -177,5 +260,5 @@
     return (doc.body.innerText || doc.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  root.DocsExport = { escapeHtml, copyRich, copyText, download, prepareForDocs, headerTable, bannerTable, htmlToText };
+  root.DocsExport = { escapeHtml, copyRich, copyText, download, prepareForDocs, headerTable, gridTable, bannerTable, htmlToText };
 })(window);
