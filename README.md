@@ -47,9 +47,22 @@ HR emails come from three places, and all three are listed together:
 | HR email content | `sn_hr_core_email_content` | `message_html` | set on the **Lifecycle Event activity** that uses it |
 | Content delivery | `sn_cd_content_notification` | `rich_text_plain_html` (layout built in) | set in **Content Publishing** (schedule and audience); the record has `state` (Draft badge), `from` and `reply_to` |
 
-HR email content and content delivery records have no category, so they
-group under "HR email content" and "Content delivery" (and so get their
-own Program Doc). Their "When it sends" and "Who receives it" sections say
+HR email content and content delivery records have no category in
+ServiceNow. Until you assign one, they group under "HR email content" and
+"Content delivery". To put them in a program:
+
+- **One at a time:** type a category in the record's **Category** field.
+  It suggests your existing notification categories.
+- **In bulk:** export the inventory (CSV or copy for Sheets). Unassigned
+  HR email content and content delivery rows have an empty **Category**
+  cell. Fill those in the sheet, download the tab as CSV, and drop it on
+  the import box. Rows are matched by `sys_id`. Only these two record types
+  take a category from the sheet; notifications always keep ServiceNow's.
+
+Assigned categories show as "… (assigned here)". The inventory's
+**Category source** column says ServiceNow / Assigned in tool / Not
+assigned. Assigned categories are saved in the settings JSON. Assigned
+records join that category's filter, Program Doc and cover counts. Their "When it sends" and "Who receives it" sections say
 where that's configured instead of guessing. Content delivery bodies
 already contain their layout, so the "Simplified layout" Docs option has
 no layout to simplify for them; their Docs copy still gets the general

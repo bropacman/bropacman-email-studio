@@ -377,3 +377,16 @@ test("content delivery body edits keep CDATA and change only that field", () => 
   const back = C.splitUnload(C.buildUnloadXml(u.decl, u.unloadOpenTag, [raw]));
   assert.equal(back.records[0].raw, raw);
 });
+
+test("inventory CSV: categories are read by sys_id; glossary CSVs aren't mistaken for it", () => {
+  const rows = C.parseCsv(
+    C.toCsv([
+      ["Name", "Source", "Category", "Category source", "sys_id"],
+      ["Welcome content", "HR email content", "Onboarding", "Not assigned", "9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D"],
+      ["Reminder", "Content delivery", "", "Not assigned", "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5"],
+      ["Bad id", "Content delivery", "X", "", "not-a-sys-id"],
+    ])
+  );
+  assert.deepEqual(C.readInventoryCategories(rows), { "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d": "Onboarding" });
+  assert.equal(C.readInventoryCategories([C.GLOSSARY_HEADER, ["Variable", "${x}", "", "", ""]]), null);
+});

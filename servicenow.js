@@ -39,6 +39,7 @@
     meanings: {}, // variable -> plain-English meaning the user typed in
     programs: {}, // category -> { description, ownerGroup, strategyUrl, inventoryUrl, reviewText } for cover pages
     scriptInfo: {}, // mail script name -> { description, example } typed in by the user
+    assignedCategories: {}, // sys_id -> category, for HR email content / content delivery (no category in ServiceNow)
     edits: {}, // sys_id -> { subject?, message_html? }
     selected: null,
     advanced: false,
@@ -182,7 +183,7 @@
     for (const file of files) {
       // Glossary CSVs and settings JSON can be dropped in the same place.
       if (/\.(csv|tsv|txt)$/i.test(file.name)) {
-        lines.push(await importGlossaryFile(file));
+        lines.push(await importCsvFile(file));
         continue;
       }
       if (/\.json$/i.test(file.name)) {
@@ -338,8 +339,14 @@
 
   // HR email content and content delivery records have no category; they
   // group under their source instead.
+  // A category assigned in this tool to an HR email content or content
+  // delivery record (notifications always use ServiceNow's category).
+  function assignedCategory(n) {
+    return isNotification(n) ? "" : S.assignedCategories[n.sysId] || "";
+  }
+
   function categoryLabel(n) {
-    if (!isNotification(n)) return sourceLabel(n);
+    if (!isNotification(n)) return assignedCategory(n) || sourceLabel(n);
     return n.dv.category || n.f.category || "(No category)";
   }
 
@@ -638,7 +645,7 @@
     Object.entries(S.scriptInfo).forEach(([name, info]) => {
       if (info && (info.description || info.example)) mailScripts[name] = { description: info.description || "", example: info.example || "" };
     });
-    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts };
+    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts, categories: S.assignedCategories };
     D.download("email-studio-settings.json", JSON.stringify(data, null, 2) + "\n", "application/json");
   }
 
@@ -646,7 +653,7 @@
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
-      const isNew = data.values || data.meanings || data.programs || data.mailScripts;
+      const isNew = data.values || data.meanings || data.programs || data.mailScripts || data.categories;
       Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
       Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
       Object.entries(isNew ? data.programs || {} : {}).forEach(([cat, p]) => {
@@ -662,6 +669,11 @@
         if (info.description != null) target.description = String(info.description);
         if (info.example != null) target.example = String(info.example);
       });
+      Object.entries(isNew ? data.categories || {} : {}).forEach(([id, cat]) => {
+        if (cat != null && String(cat).trim()) S.assignedCategories[id] = String(cat).trim();
+      });
+      refreshFilterOptions();
+      renderList();
       renderSelected();
       updateCoverPanel(true);
       return true;
@@ -759,11 +771,12 @@
             ? badge("Active", "ok")
             : badge("Inactive", "muted"),
           n.table === "sn_cd_content_notification" && n.f.state ? badge(cap(n.f.state), n.f.state === "published" ? "ok" : "warn") : null,
-          badge(categoryLabel(n)),
+          badge(assignedCategory(n) ? `${categoryLabel(n)} (assigned here)` : categoryLabel(n), assignedCategory(n) ? "edit" : ""),
           isEdited(n) || isEdited(e.template) ? badge("Edited locally", "edit") : null
         ),
         n.f.description ? h("p", { class: "muted" }, n.f.description) : null
       ),
+      isNotification(n) ? null : categoryField(n),
       isNotification(n) ? null : otherSourceWhen(n),
       isNotification(n) ? null : otherSourceWho(n),
       !isNotification(n)
@@ -829,6 +842,50 @@
 
   // "When it sends" / "Who receives it" for HR email content and content
   // delivery records: these say where that's configured instead of guessing.
+  // Category for records ServiceNow doesn't categorize. Suggests the
+  // existing notification categories so a record can join that program.
+  function categoryField(n) {
+    const known = new Set();
+    S.notifications.forEach((x) => {
+      if (isNotification(x) && (x.dv.category || x.f.category)) known.add(x.dv.category || x.f.category);
+      if (assignedCategory(x)) known.add(assignedCategory(x));
+    });
+    const listId = "snCategoryOptions";
+    const apply = (value) => {
+      const v = value.trim();
+      if (v && v !== sourceLabel(n)) S.assignedCategories[n.sysId] = v;
+      else delete S.assignedCategories[n.sysId];
+      refreshFilterOptions();
+      renderList();
+      renderSelected();
+      updateCoverPanel(true);
+    };
+    return section(
+      "Category",
+      h(
+        "p",
+        { class: "muted" },
+        `ServiceNow has no category for ${sourceLabel(n)}. Assign one here so it joins that program's list, Doc and cover - ` +
+          "or fill the Category column in the inventory sheet and import that CSV. Kept in memory and saved with the settings JSON."
+      ),
+      h(
+        "div",
+        { class: "sn-buttons" },
+        h("input", {
+          type: "text",
+          class: "sn-category-input",
+          list: listId,
+          value: assignedCategory(n),
+          placeholder: `e.g. ${[...known][0] || "Human Resources"}`,
+          "aria-label": "Assigned category",
+          onchange: (ev) => apply(ev.target.value),
+        }),
+        h("datalist", { id: listId }, [...known].sort().map((c) => h("option", { value: c }))),
+        assignedCategory(n) ? h("button", { type: "button", class: "secondary", onclick: () => apply("") }, "Clear") : null
+      )
+    );
+  }
+
   function otherSourceWhen(n) {
     const isContent = n.table === "sn_hr_core_email_content";
     return section(
@@ -1095,6 +1152,7 @@
     "Name",
     "Source",
     "Category",
+    "Category source",
     "Table",
     "Table name",
     "Trigger summary",
@@ -1113,7 +1171,10 @@
       ...filteredNotifications().map((n) => [
         n.f.name || "",
         sourceLabel(n),
-        categoryLabel(n),
+        // Unassigned HR email content / content delivery rows get an empty
+        // Category cell, ready to be filled in the sheet and imported back.
+        isNotification(n) ? categoryLabel(n) : assignedCategory(n),
+        isNotification(n) ? (n.dv.category || n.f.category ? "ServiceNow" : "None") : assignedCategory(n) ? "Assigned in tool" : "Not assigned",
         n.f.collection ? C.friendlyTable(n.f.collection) : "",
         n.f.collection || "",
         C.triggerSummary(n.f, n.conditionDisplay, { friendly: true }),
@@ -1478,14 +1539,52 @@
   els.importGlossaryInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     e.target.value = "";
-    if (file) setStatus([await importGlossaryFile(file)]);
+    if (file) setStatus([await importCsvFile(file)]);
   });
+
+  // A dropped/picked CSV is either the inventory (has sys_id + Category
+  // columns: assign categories) or the glossary. Returns a status line.
+  async function importCsvFile(file) {
+    let rows;
+    try {
+      rows = C.parseCsv(await file.text());
+    } catch (err) {
+      return `${file.name}: could not read CSV - ${err.message}`;
+    }
+    const cats = C.readInventoryCategories(rows);
+    return cats ? applyInventoryCategories(file.name, cats) : importGlossaryRows(file.name, rows);
+  }
+
+  // Only HR email content / content delivery records take a category from
+  // the sheet; notifications keep ServiceNow's.
+  function applyInventoryCategories(fileName, cats) {
+    let applied = 0;
+    let ignored = 0;
+    Object.entries(cats).forEach(([id, cat]) => {
+      const n = S.notifications.get(id);
+      if (!n || isNotification(n) || cat === sourceLabel(n)) {
+        ignored++;
+        return;
+      }
+      S.assignedCategories[id] = cat;
+      applied++;
+    });
+    refreshFilterOptions();
+    renderList();
+    renderSelected();
+    updateCoverPanel(true);
+    return (
+      `${fileName}: inventory - categories assigned to ${applied} HR email content / content delivery record${applied === 1 ? "" : "s"}` +
+      (ignored ? ` (${ignored} rows left as they are: notifications keep ServiceNow's category, or the record isn't imported yet)` : "")
+    );
+  }
 
   // Applies a glossary CSV: variable meanings + sample values, mail script
   // descriptions + examples. Returns a status line.
-  async function importGlossaryFile(file) {
+  async function importGlossaryRows(fileName, rows) {
+    const file = { name: fileName };
     try {
-      const g = C.readGlossary(C.parseCsv(await file.text()));
+      const g = C.readGlossary(rows);
       Object.entries(g.variables).forEach(([name, v]) => {
         if (v.meaning) S.meanings[name] = v.meaning;
         if (v.example) S.sample[name] = v.example;

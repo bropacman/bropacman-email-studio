@@ -759,6 +759,25 @@
     return rows.filter((r) => r.some((v) => v.trim() !== ""));
   }
 
+  // Reads categories typed into the inventory sheet's Category column.
+  // rows: parsed CSV with a header row containing "sys_id" and "Category".
+  // Returns { sys_id: category } for rows with a category, or null if the
+  // header doesn't look like an inventory export.
+  function readInventoryCategories(rows) {
+    if (!rows.length) return null;
+    const header = rows[0].map((h) => h.trim().toLowerCase());
+    const iId = header.indexOf("sys_id");
+    const iCat = header.indexOf("category");
+    if (iId === -1 || iCat === -1) return null;
+    const out = {};
+    for (const r of rows.slice(1)) {
+      const id = String(r[iId] || "").trim();
+      const cat = unguard(String(r[iCat] || "")).trim();
+      if (/^[0-9a-f]{32}$/i.test(id) && cat) out[id.toLowerCase()] = cat;
+    }
+    return out;
+  }
+
   // ---------------------------------------------------------------------
   // Glossary (a tab in the inventory Google Sheet)
   //
@@ -855,6 +874,7 @@
     toTsv,
     parseCsv,
     readGlossary,
+    readInventoryCategories,
     GLOSSARY_HEADER,
   };
 });
