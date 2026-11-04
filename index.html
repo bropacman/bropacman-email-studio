@@ -20,7 +20,11 @@
           <p>Preview what a notification email will actually look like before it's sent &mdash; no login required.</p>
         </div>
       </div>
-      <div class="preset-picker">
+      <nav class="view-tabs" role="tablist" aria-label="Tool">
+        <button type="button" role="tab" id="tab-composer" aria-selected="true" aria-controls="composerView">Composer</button>
+        <button type="button" role="tab" id="tab-sn" aria-selected="false" aria-controls="snView">ServiceNow import</button>
+      </nav>
+      <div class="preset-picker" id="presetPicker">
         <label for="preset">Start from a template</label>
         <select id="preset">
           <option value="">Blank</option>
@@ -29,7 +33,7 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="composerView" role="tabpanel" aria-labelledby="tab-composer">
     <section class="editor" aria-label="Email fields">
       <div class="field">
         <label for="from">From</label>
@@ -83,6 +87,11 @@
         <button id="downloadHtml" type="button">Download as .html</button>
       </div>
       <div class="actions">
+        <button id="copyDocs" type="button" title="From/To/Cc/Subject plus the banner or full layout and images, formatted to paste cleanly into a Google Doc.">
+          Copy for Google Docs
+        </button>
+      </div>
+      <div class="actions">
         <button id="copyBodyHtml" type="button" title="Just the Body field's HTML, with no wrapper — paste this into ServiceNow's Message HTML field.">
           Copy body HTML only
         </button>
@@ -117,7 +126,77 @@
     </section>
   </main>
 
+  <main class="sn-layout" id="snView" role="tabpanel" aria-labelledby="tab-sn" hidden>
+    <aside class="sn-sidebar panel" aria-label="Imported notifications">
+      <p class="privacy-note">
+        <strong>Privacy:</strong> imported records stay in this browser tab's memory only &mdash;
+        nothing is uploaded or saved. Refreshing or closing the tab clears everything.
+      </p>
+
+      <label class="dropzone" id="snDropzone">
+        <input type="file" id="snFileInput" accept=".xml,text/xml,application/xml" multiple>
+        <strong>Drop ServiceNow XML exports here</strong>
+        <span>or click to choose files (notifications, templates, mail scripts, layouts)</span>
+      </label>
+      <div class="sn-import-status" id="snImportStatus" aria-live="polite"></div>
+      <button type="button" class="link-button" id="snLoadDemo">Load fake demo data</button>
+
+      <div class="sn-filters" id="snFilters" hidden>
+        <input type="search" id="snSearch" placeholder="Search name, subject, table, event..." aria-label="Search notifications">
+        <div class="sn-filter-row">
+          <select id="snFilterCategory" aria-label="Filter by category"><option value="">All categories</option></select>
+          <select id="snFilterTable" aria-label="Filter by table"><option value="">All tables</option></select>
+          <select id="snFilterActive" aria-label="Filter by active">
+            <option value="">Active + inactive</option>
+            <option value="true">Active only</option>
+            <option value="false">Inactive only</option>
+          </select>
+        </div>
+        <div class="sn-count" id="snCount"></div>
+      </div>
+
+      <div class="sn-list" id="snList" role="listbox" aria-label="Notifications"></div>
+
+      <div class="sn-exports" id="snExports" hidden>
+        <button type="button" id="snExportCsv">Export inventory CSV</button>
+        <button type="button" id="snCopySheets" class="secondary">Copy inventory for Google Sheets</button>
+        <label class="sn-toggle"><input type="checkbox" id="snAdvancedToggle"> Advanced: edit &amp; download XML</label>
+      </div>
+    </aside>
+
+    <section class="sn-detail panel" id="snDetail" aria-label="Notification details">
+      <div class="sn-empty">Import one or more ServiceNow XML exports to get started, or load the fake demo data.</div>
+    </section>
+
+    <section class="preview-pane sn-preview" aria-label="Email preview">
+      <div class="window-chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <span class="window-title">Inbox Preview (sample data)</span>
+      </div>
+      <div class="sn-preview-actions">
+        <button type="button" id="snCopyDocs" disabled>Copy for Google Docs</button>
+        <label class="sn-toggle"><input type="checkbox" id="snDocsIncludeLayout" checked> Include layout</label>
+      </div>
+      <div class="email-shell">
+        <div class="email-meta">
+          <div class="meta-row"><span class="meta-label">From</span><span id="sn-pv-from" class="meta-value"></span></div>
+          <div class="meta-row"><span class="meta-label">To</span><span id="sn-pv-to" class="meta-value"></span></div>
+          <div class="meta-row"><span class="meta-label">Subject</span><span id="sn-pv-subject" class="meta-value subject-value"></span></div>
+        </div>
+        <iframe id="sn-pv-frame" title="Notification preview" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>
+        <div class="email-footer">
+          Preview generated outside of ServiceNow with sample data. Mail scripts are not executed.
+          Not affiliated with, endorsed by, or sponsored by ServiceNow, Inc.
+        </div>
+      </div>
+    </section>
+  </main>
+
   <script src="vendor/tinymce/tinymce.min.js"></script>
+  <script src="docs-export.js"></script>
   <script src="app.js"></script>
+  <script src="sn-core.js"></script>
+  <script src="fixtures/demo-data.js"></script>
+  <script src="servicenow.js"></script>
 </body>
 </html>

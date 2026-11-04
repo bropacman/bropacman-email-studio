@@ -13,6 +13,7 @@
     copyHtml: document.getElementById("copyHtml"),
     downloadHtml: document.getElementById("downloadHtml"),
     copyBodyHtml: document.getElementById("copyBodyHtml"),
+    copyDocs: document.getElementById("copyDocs"),
     simpleHeaderFields: document.getElementById("simpleHeaderFields"),
     layoutNotice: document.getElementById("layoutNotice"),
     fallbackFonts: document.getElementById("fallbackFonts"),
@@ -109,7 +110,7 @@
         height: 320,
         plugins: "lists link code autolink",
         toolbar:
-          "undo redo | fontfamily fontsize | bold italic underline | bullist numlist outdent indent | link | code | cleanupformatting",
+          "undo redo | fontfamily fontsize | bold italic underline | bullist numlist outdent indent | link | code | cleanupformatting | bodyfullscreen",
         // "wrap" (rather than the default "floating") shows every toolbar
         // button, wrapping onto additional rows as needed, instead of
         // collapsing overflow into a "..." dropdown.
@@ -174,12 +175,41 @@
           // newly-selected template - showing the new body with the
           // previous template's banner until the explicit render() call
           // (below, now reordered to run last) corrects it.
+          // Full screen without the TinyMCE fullscreen plugin (not vendored
+          // here): pin the editor's own container over the viewport with a
+          // CSS class. Esc or the same button exits.
+          editor.ui.registry.addToggleButton("bodyfullscreen", {
+            icon: "fullscreen",
+            tooltip: "Full screen (Esc to exit)",
+            onAction: () => toggleEditorFullscreen(),
+            onSetup: (api) => {
+              fullscreenButtonApi = api;
+              return () => {};
+            },
+          });
+          editor.on("keydown", (e) => {
+            if (e.key === "Escape" && editorIsFullscreen) toggleEditorFullscreen(false);
+          });
           editor.on("input undo redo Change", () => render());
           editor.on("init", () => resolve(editor));
         },
       });
     });
   }
+
+  let editorIsFullscreen = false;
+  let fullscreenButtonApi = null;
+  function toggleEditorFullscreen(force) {
+    if (!bodyEditor) return;
+    editorIsFullscreen = typeof force === "boolean" ? force : !editorIsFullscreen;
+    bodyEditor.getContainer().classList.toggle("editor-fullscreen", editorIsFullscreen);
+    document.body.classList.toggle("editor-fullscreen-active", editorIsFullscreen);
+    if (fullscreenButtonApi) fullscreenButtonApi.setActive(editorIsFullscreen);
+    bodyEditor.focus();
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && editorIsFullscreen) toggleEditorFullscreen(false);
+  });
 
   async function loadTemplates() {
     try {
@@ -488,6 +518,44 @@
   // pasting directly into ServiceNow's Message HTML field, since the layout
   // (if any) is a separate record there, not part of the notification body.
   els.copyBodyHtml.addEventListener("click", () => copyToClipboard(els.copyBodyHtml, renderBodyHtml()));
+
+  // Everything about the email - From/To/Cc/Subject header table, then the
+  // banner (simple mode) or the full layout - as rich HTML for pasting into
+  // Google Docs. Docs drops <div> backgrounds, so the banner becomes a
+  // one-cell table, and same-origin images (e.g. the layout's banner image)
+  // are embedded as data: URIs because Docs can't fetch relative URLs.
+  function buildDocsCopy() {
+    const rows = [
+      ["From", els.from.value.trim()],
+      ["To", els.to.value.trim()],
+    ];
+    if (els.cc.value.trim()) rows.push(["Cc", els.cc.value.trim()]);
+    rows.push(["Subject", els.subject.value.trim()]);
+    const bodyHtml = renderBodyHtml();
+    let email;
+    if (currentLayoutHtml) {
+      const layout = els.fallbackFonts.checked ? stripWebFonts(currentLayoutHtml) : currentLayoutHtml;
+      const body = els.fallbackFonts.checked ? stripWebFonts(bodyHtml) : bodyHtml;
+      email = fillLayoutPlaceholders(layout, body);
+    } else {
+      const headerText = els.headerText.value.trim();
+      email =
+        (headerText ? DocsExport.bannerTable(headerText, els.headerColor.value) : "") +
+        `<div style="font-family:Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.5;">${bodyHtml}</div>`;
+    }
+    return { rows, email };
+  }
+
+  els.copyDocs.addEventListener("click", async () => {
+    const { rows, email } = buildDocsCopy();
+    const prepared = await DocsExport.prepareForDocs(email);
+    const html = DocsExport.headerTable(rows) + prepared;
+    const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + DocsExport.htmlToText(prepared);
+    const ok = await DocsExport.copyRich(html, text);
+    const original = els.copyDocs.textContent;
+    els.copyDocs.textContent = ok ? "Copied! Paste into Google Docs" : "Copy failed";
+    setTimeout(() => (els.copyDocs.textContent = original), 1600);
+  });
 
   els.downloadHtml.addEventListener("click", () => {
     const html = buildStandaloneHtml();
