@@ -40,6 +40,7 @@
     programs: {}, // category -> { description, ownerGroup, strategyUrl, inventoryUrl, reviewText } for cover pages
     scriptInfo: {}, // mail script name -> { description, example } typed in by the user
     assignedCategories: {}, // sys_id -> category, for HR email content / content delivery (no category in ServiceNow)
+    customCategories: [], // category names created in this tool (may not exist in ServiceNow yet)
     edits: {}, // sys_id -> { subject?, message_html? }
     selected: null,
     advanced: false,
@@ -92,6 +93,14 @@
     exportSettings: $("snExportSettings"),
     importSettings: $("snImportSettings"),
     importSettingsInput: $("snImportSettingsInput"),
+    newCategory: $("snNewCategory"),
+    createCategory: $("snCreateCategory"),
+    categoryList: $("snCategoryList"),
+    assignCategory: $("snAssignCategory"),
+    categoryRecords: $("snCategoryRecords"),
+    assignSelected: $("snAssignSelected"),
+    unassignSelected: $("snUnassignSelected"),
+    categoryStatus: $("snCategoryStatus"),
     pvFrom: $("sn-pv-from"),
     pvTo: $("sn-pv-to"),
     pvSubject: $("sn-pv-subject"),
@@ -379,8 +388,12 @@
       cats.add(categoryLabel(n));
       tables.add(n.f.collection || "(no table)");
     });
+    // Created categories show even before anything is assigned, so their
+    // Program Doc cover can be filled in up front.
+    S.customCategories.forEach((c) => cats.add(c));
     fill(els.fCategory, cats, "All categories");
     fill(els.fTable, tables, "All tables", (t) => (t === "(no table)" ? t : C.friendlyTable(t)));
+    renderCategoryPanel();
   }
 
   function filteredNotifications() {
@@ -645,7 +658,7 @@
     Object.entries(S.scriptInfo).forEach(([name, info]) => {
       if (info && (info.description || info.example)) mailScripts[name] = { description: info.description || "", example: info.example || "" };
     });
-    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts, categories: S.assignedCategories };
+    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts, categories: S.assignedCategories, customCategories: S.customCategories };
     D.download("email-studio-settings.json", JSON.stringify(data, null, 2) + "\n", "application/json");
   }
 
@@ -653,7 +666,7 @@
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
-      const isNew = data.values || data.meanings || data.programs || data.mailScripts || data.categories;
+      const isNew = data.values || data.meanings || data.programs || data.mailScripts || data.categories || data.customCategories;
       Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
       Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
       Object.entries(isNew ? data.programs || {} : {}).forEach(([cat, p]) => {
@@ -672,6 +685,7 @@
       Object.entries(isNew ? data.categories || {} : {}).forEach(([id, cat]) => {
         if (cat != null && String(cat).trim()) S.assignedCategories[id] = String(cat).trim();
       });
+      (isNew && Array.isArray(data.customCategories) ? data.customCategories : []).forEach((c) => addCustomCategory(c));
       refreshFilterOptions();
       renderList();
       renderSelected();
@@ -845,11 +859,7 @@
   // Category for records ServiceNow doesn't categorize. Suggests the
   // existing notification categories so a record can join that program.
   function categoryField(n) {
-    const known = new Set();
-    S.notifications.forEach((x) => {
-      if (isNotification(x) && (x.dv.category || x.f.category)) known.add(x.dv.category || x.f.category);
-      if (assignedCategory(x)) known.add(assignedCategory(x));
-    });
+    const known = knownCategories();
     const listId = "snCategoryOptions";
     const apply = (value) => {
       const v = value.trim();
@@ -866,6 +876,7 @@
         "p",
         { class: "muted" },
         `ServiceNow has no category for ${sourceLabel(n)}. Assign one here so it joins that program's list, Doc and cover - ` +
+          "type a new name to create a category, use the Categories panel to assign many at once, " +
           "or fill the Category column in the inventory sheet and import that CSV. Kept in memory and saved with the settings JSON."
       ),
       h(
@@ -885,6 +896,199 @@
       )
     );
   }
+
+  // ------------------------------------------------------------------
+  // Categories panel: create categories for HR email content / content
+  // delivery records (which have none in ServiceNow) and assign in bulk.
+  // ------------------------------------------------------------------
+
+  // Every category name in use: ServiceNow's notification categories,
+  // ones assigned in this tool, and ones created here.
+  function knownCategories() {
+    const known = new Set(S.customCategories);
+    S.notifications.forEach((x) => {
+      if (isNotification(x) && (x.dv.category || x.f.category)) known.add(x.dv.category || x.f.category);
+      if (assignedCategory(x)) known.add(assignedCategory(x));
+    });
+    return known;
+  }
+
+  // Names that would collide with the built-in groupings.
+  function reservedCategory(name) {
+    const lower = name.toLowerCase();
+    return lower === "(no category)" || Object.values(C.SOURCES).some((src) => (src.label || "").toLowerCase() === lower);
+  }
+
+  // Adds a created category. Returns the stored name (an existing name
+  // that differs only in case is reused), or "" if the name can't be used.
+  function addCustomCategory(raw) {
+    const name = String(raw == null ? "" : raw).trim();
+    if (!name || reservedCategory(name)) return "";
+    const existing = [...knownCategories()].find((c) => c.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      if (!S.customCategories.includes(existing)) S.customCategories.push(existing);
+      return existing;
+    }
+    S.customCategories.push(name);
+    return name;
+  }
+
+  const catTicked = new Set(); // sys_ids ticked in the Categories panel
+
+  function categoryRecords() {
+    return [...S.notifications.values()]
+      .filter((n) => !isNotification(n))
+      .sort((a, b) => sourceLabel(a).localeCompare(sourceLabel(b)) || (a.f.name || "").localeCompare(b.f.name || ""));
+  }
+
+  function categoriesChanged() {
+    refreshFilterOptions();
+    renderList();
+    renderSelected();
+    updateCoverPanel(true);
+  }
+
+  function renderCategoryPanel() {
+    const records = categoryRecords();
+    [...catTicked].forEach((id) => {
+      if (!S.notifications.has(id)) catTicked.delete(id);
+    });
+
+    // Chips for categories created or assigned in this tool, with counts.
+    const counts = {};
+    records.forEach((n) => {
+      const c = assignedCategory(n);
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    const mine = [...new Set([...S.customCategories, ...Object.keys(counts)])].sort((a, b) => a.localeCompare(b));
+    els.categoryList.replaceChildren(
+      ...(mine.length
+        ? mine.map((c) =>
+            h(
+              "span",
+              { class: "sn-cat-chip" },
+              `${c} (${counts[c] || 0})`,
+              h("button", { type: "button", title: `Remove ${c}`, "aria-label": `Remove category ${c}`, onclick: () => removeCategory(c) }, "×")
+            )
+          )
+        : [h("span", { class: "muted" }, "No categories created yet.")])
+    );
+
+    // Target picker: every known category, created ones first.
+    const cur = els.assignCategory.value;
+    const all = [...knownCategories()].sort((a, b) => a.localeCompare(b));
+    els.assignCategory.replaceChildren(
+      ...(all.length ? all.map((c) => new Option(S.customCategories.includes(c) ? `${c} (new)` : c, c)) : [new Option("Create a category first", "")])
+    );
+    if (all.includes(cur)) els.assignCategory.value = cur;
+
+    // Record checklist.
+    if (!records.length) {
+      els.categoryRecords.replaceChildren(h("div", { class: "muted" }, "No HR email content or content delivery records imported."));
+    } else {
+      const boxes = [];
+      const allBox = h("input", {
+        type: "checkbox",
+        class: "sn-cat-all-box",
+        onchange: (ev) => {
+          records.forEach((n) => (ev.target.checked ? catTicked.add(n.sysId) : catTicked.delete(n.sysId)));
+          boxes.forEach((b) => (b.checked = ev.target.checked));
+          syncCategoryControls();
+        },
+      });
+      els.categoryRecords.replaceChildren(
+        h("label", { class: "sn-cat-all" }, allBox, `Select all (${records.length})`),
+        ...records.map((n) => {
+          const box = h("input", {
+            type: "checkbox",
+            onchange: (ev) => {
+              ev.target.checked ? catTicked.add(n.sysId) : catTicked.delete(n.sysId);
+              syncCategoryControls();
+            },
+          });
+          box.checked = catTicked.has(n.sysId);
+          boxes.push(box);
+          return h(
+            "label",
+            null,
+            box,
+            h("span", null, n.f.name || n.sysId, " ", h("span", { class: "muted" }, `- ${assignedCategory(n) || "not assigned"} · ${sourceLabel(n)}`))
+          );
+        })
+      );
+    }
+    syncCategoryControls();
+  }
+
+  // Select-all state and button enablement, without rebuilding the list.
+  function syncCategoryControls() {
+    const total = categoryRecords().length;
+    const allBox = els.categoryRecords.querySelector(".sn-cat-all-box");
+    if (allBox) {
+      allBox.checked = total > 0 && catTicked.size === total;
+      allBox.indeterminate = catTicked.size > 0 && catTicked.size < total;
+    }
+    els.assignSelected.disabled = !catTicked.size || !els.assignCategory.value;
+    els.unassignSelected.disabled = !catTicked.size;
+  }
+
+  function createCategory() {
+    const raw = els.newCategory.value.trim();
+    if (!raw) {
+      els.categoryStatus.textContent = "Type a name for the new category.";
+      return;
+    }
+    if (reservedCategory(raw)) {
+      els.categoryStatus.textContent = `"${raw}" is a built-in grouping - pick another name.`;
+      return;
+    }
+    const existed = [...knownCategories()].some((c) => c.toLowerCase() === raw.toLowerCase());
+    const name = addCustomCategory(raw);
+    els.newCategory.value = "";
+    categoriesChanged();
+    els.assignCategory.value = name;
+    renderCategoryPanel();
+    els.categoryStatus.textContent = existed
+      ? `"${name}" already exists - selected it below.`
+      : `Created "${name}". Tick records below and assign them, or pick it in the category filter to fill in its Program Doc cover.`;
+  }
+
+  function assignTicked(cat) {
+    let count = 0;
+    catTicked.forEach((id) => {
+      const n = S.notifications.get(id);
+      if (!n || isNotification(n)) return;
+      if (cat) S.assignedCategories[id] = cat;
+      else delete S.assignedCategories[id];
+      count++;
+    });
+    catTicked.clear();
+    categoriesChanged();
+    const what = `${count} record${count === 1 ? "" : "s"}`;
+    els.categoryStatus.textContent = cat ? `Assigned ${what} to "${cat}".` : `Cleared the category on ${what}.`;
+  }
+
+  // Removing a category also clears it from the records assigned to it
+  // (they go back under "HR email content" / "Content delivery").
+  function removeCategory(cat) {
+    const assigned = Object.keys(S.assignedCategories).filter((id) => S.assignedCategories[id] === cat);
+    if (assigned.length && !confirm(`Remove "${cat}"? ${assigned.length} record${assigned.length === 1 ? "" : "s"} will lose this category.`)) return;
+    assigned.forEach((id) => delete S.assignedCategories[id]);
+    S.customCategories = S.customCategories.filter((c) => c !== cat);
+    categoriesChanged();
+    els.categoryStatus.textContent = `Removed "${cat}".`;
+  }
+
+  els.createCategory.addEventListener("click", createCategory);
+  els.newCategory.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      createCategory();
+    }
+  });
+  els.assignCategory.addEventListener("input", syncCategoryControls);
+  els.assignSelected.addEventListener("click", () => els.assignCategory.value && assignTicked(els.assignCategory.value));
+  els.unassignSelected.addEventListener("click", () => assignTicked(""));
 
   function otherSourceWhen(n) {
     const isContent = n.table === "sn_hr_core_email_content";
@@ -1095,7 +1299,7 @@
   async function notificationDocs(n, title) {
     const e = effective(n);
     const showNames = els.docsShowNames.checked;
-    const subject = showNames ? C.fillText(e.subject, null) : C.fillText(e.subject, S.sample);
+    const subject = showNames ? C.fillText(e.subject, null, { showNames }) : C.fillText(e.subject, S.sample);
     // Kept short on purpose - the full config is in the inventory sheet.
     const rows = [
       ["Notification", n.f.name || ""],
