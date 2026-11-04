@@ -8,7 +8,7 @@
      also renders Montserrat/Lora correctly when applied via the editor's
      font picker on a simple (non-layout) template. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,700;1,400&family=Montserrat:ital,wght@0,400;0,700;1,400&display=swap">
-<link rel="stylesheet" href="style.css?v=9210091b">
+<link rel="stylesheet" href="style.css?v=ca54adf9">
 </head>
 <body>
   <header class="topbar">
@@ -16,7 +16,7 @@
       <div class="brand">
         <span class="brand-mark">ES</span>
         <div>
-          <h1>Bropacman Email Studio <span class="app-version" id="appVersion" title="Changes with every release. If it doesn't change after an update, refresh the page.">build 9210091b</span></h1>
+          <h1>Bropacman Email Studio <span class="app-version" id="appVersion" title="Changes with every release. If it doesn't change after an update, refresh the page.">build ca54adf9</span></h1>
           <p>Preview what a notification email will actually look like before it's sent &mdash; no login required.</p>
         </div>
       </div>
@@ -134,9 +134,9 @@
       </p>
 
       <label class="dropzone" id="snDropzone">
-        <input type="file" id="snFileInput" accept=".xml,text/xml,application/xml" multiple>
+        <input type="file" id="snFileInput" accept=".xml,text/xml,application/xml,.csv,text/csv,.json,application/json" multiple>
         <strong>Drop ServiceNow XML exports here</strong>
-        <span>or click to choose files (notifications, templates, mail scripts, layouts)</span>
+        <span>or click to choose files (notifications, templates, mail scripts, layouts). Glossary CSV and settings JSON files can go here too.</span>
       </label>
       <div class="sn-import-status" id="snImportStatus" aria-live="polite"></div>
       <button type="button" class="link-button" id="snLoadDemo">Load fake demo data</button>
@@ -160,6 +160,20 @@
       <div class="sn-exports" id="snExports" hidden>
         <button type="button" id="snExportCsv">Export inventory CSV</button>
         <button type="button" id="snCopySheets" class="secondary">Copy inventory for Google Sheets</button>
+        <details class="sn-cover" id="snGlossary">
+          <summary>Glossary tab (mail scripts &amp; variables)</summary>
+          <p class="muted">
+            One row per mail script and ${variable} used across all imported notifications, with what it means, an example and
+            how many notifications use it. Paste it into a <strong>Glossary</strong> tab in the inventory sheet and let the team fill it in.
+            Then bring it back with File &gt; Download &gt; CSV and import it here (or drop the CSV on the import box above).
+          </p>
+          <button type="button" id="snCopyGlossary">Copy glossary for Google Sheets</button>
+          <div class="sn-buttons">
+            <button type="button" class="secondary" id="snExportGlossary">Export glossary CSV</button>
+            <button type="button" class="secondary" id="snImportGlossary">Import glossary CSV</button>
+            <input type="file" id="snImportGlossaryInput" accept=".csv,text/csv,.tsv,.txt" hidden>
+          </div>
+        </details>
         <details class="sn-cover" id="snCover">
           <summary>Program Doc (cover + all notifications)</summary>
           <p class="muted" id="snCoverHint">Pick a category in the filter above to build its program Doc.</p>
@@ -238,10 +252,10 @@
   </main>
 
   <script src="vendor/tinymce/tinymce.min.js"></script>
-  <script src="docs-export.js?v=9210091b"></script>
-  <script src="app.js?v=9210091b"></script>
-  <script src="sn-core.js?v=9210091b"></script>
-  <script src="fixtures/demo-data.js?v=9210091b"></script>
-  <script src="servicenow.js?v=9210091b"></script>
+  <script src="docs-export.js?v=ca54adf9"></script>
+  <script src="app.js?v=ca54adf9"></script>
+  <script src="sn-core.js?v=ca54adf9"></script>
+  <script src="fixtures/demo-data.js?v=ca54adf9"></script>
+  <script src="servicenow.js?v=ca54adf9"></script>
 </body>
 </html>

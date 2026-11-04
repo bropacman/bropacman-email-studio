@@ -644,6 +644,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sn-cover[open] summary { margin-bottom: 8px; }
 .sn-cover p { margin: 6px 0; }
 .sn-cover-title { font-weight: 700; font-size: 13px; }
+#snCopyGlossary { width: 100%; margin-bottom: 4px; }
 .sn-cover #snCopyProgram,
 .sn-cover #snCopyCover { width: 100%; margin-bottom: 4px; }
 .sn-cover-status { display: block; }
