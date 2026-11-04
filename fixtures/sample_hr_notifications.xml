@@ -254,4 +254,66 @@ answer = hasSurvey &amp;&amp; current.state == 3;</advanced_condition>
 <sys_updated_on>2024-01-01 00:00:00</sys_updated_on>
 <template/>
 </sysevent_email_action>
+<sn_hr_core_email_content action="INSERT_OR_UPDATE">
+<description>FAKE DEMO DATA. Content sent by a Lifecycle Event activity.</description>
+<message_html><![CDATA[<div><span style="font-family: georgia, serif; font-size: 12pt;">Hi ${subject_person.name},</span></div>
+<div>&nbsp;</div>
+<div><span style="font-family: georgia, serif; font-size: 12pt;">Congratulations on your new role at Sample Co! This email lists the steps to complete before your first day.</span></div>
+<div>&nbsp;</div>
+<div><span style="font-family: georgia, serif; font-size: 12pt;"><strong>To log in, ${mail_script:hr_portal_link}:</strong></span>
+<ul>
+<li><span style="font-family: georgia, serif; font-size: 12pt;"><strong>Username:</strong> ${subject_person.user_name}</span></li>
+<li><span style="font-family: georgia, serif; font-size: 12pt;"><strong>Start date:</strong> ${subject_person.u_start_date}</span></li>
+</ul>
+</div>
+<div><span style="font-family: georgia, serif; font-size: 12pt;">Best regards,<br>Sample HR</span></div>]]></message_html>
+<name>Sample - New hire welcome content</name>
+<subject>Get ready for your first day, ${subject_person.first_name}!</subject>
+<sys_class_name>sn_hr_core_email_content</sys_class_name>
+<sys_created_by>fake.admin</sys_created_by>
+<sys_created_on>2025-12-04 16:40:14</sys_created_on>
+<sys_domain>global</sys_domain>
+<sys_id>9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d</sys_id>
+<sys_mod_count>6</sys_mod_count>
+<sys_name>Sample - New hire welcome content</sys_name>
+<sys_scope display_value="Human Resources: Lifecycle Events">e1fc3fff5b311200a4656ede91f91a00</sys_scope>
+<sys_update_name>sn_hr_core_email_content_9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d</sys_update_name>
+<sys_updated_by>fake.admin</sys_updated_by>
+<sys_updated_on>2026-10-30 12:00:00</sys_updated_on>
+<table>sn_hr_le_case</table>
+<type>activity_notification</type>
+</sn_hr_core_email_content>
+<sn_cd_content_notification action="INSERT_OR_UPDATE">
+<active>true</active>
+<allow_comments>false</allow_comments>
+<content_type display_value="Email">02dccfc33b630300d901655593efc4df</content_type>
+<description/>
+<from>hr-noreply@example.invalid</from>
+<reply_to>hr-noreply@example.invalid</reply_to>
+<rich_text_plain_html><![CDATA[<table style="width: 100%; background-color: #f6f6f8; height: 300px;"><tbody><tr style="height: 300px;"><td style="width: 100%; height: 300px;">
+<table style="border-collapse: collapse; width: 100%; height: 20px;"><tbody><tr><td style="height: 20px;"> </td></tr></tbody></table>
+<table style="width: 100%; max-width: 640px; margin: auto; border: 1px solid #cbcbcb;"><tbody><tr style="height: 66px;"><td style="color: #ffffff; height: 66px; background-color: #288be4; padding: 10px 20px;">
+<table style="border-collapse: collapse; width: 100%;"><tbody><tr><td style="width: 50%; height: 46px;"><img src="sample_banner.pngx" alt="" width="80%" /></td><td style="width: 50%; height: 46px;"><span style="font-family: Arial, sans-serif; font-size: calc(17px + 0.39vw);"><strong>ANNUAL REMINDER</strong></span></td></tr></tbody></table>
+</td></tr><tr style="height: 240px;"><td style="color: #091f2f; font-size: 16px; background-color: #ffffff; padding: 25px 20px; height: 240px;">
+<p><span style="font-size: 12pt; font-family: Georgia, serif;">Hello,</span></p>
+<p><span style="font-size: 12pt; font-family: Georgia, serif;">The annual review period begins today. Please complete your tasks in the <a href="https://portal.example.invalid">HR Portal</a> by <strong>Friday, April 24</strong>.</span></p>
+<p><span style="font-size: 12pt; font-family: Georgia, serif;">Thank you,<br>Sample HR</span></p>
+</td></tr><tr style="height: 76px;"><td style="color: #091f2f; height: 76px; background-color: #ffffff; padding-left: 30px;">
+<p style="text-align: center;"><span style="font-family: Georgia, serif; font-size: 12pt;"><em>Please be advised that this is an automated email.</em></span></p>
+</td></tr></tbody></table>
+<table style="border-collapse: collapse; width: 100%; height: 20px;"><tbody><tr><td style="height: 20px;"> </td></tr></tbody></table>
+</td></tr></tbody></table>]]></rich_text_plain_html>
+<state>draft</state>
+<subject>It's time to complete your annual review tasks</subject>
+<sys_class_name>sn_cd_content_notification</sys_class_name>
+<sys_created_by>fake.admin</sys_created_by>
+<sys_created_on>2022-03-29 13:00:53</sys_created_on>
+<sys_domain>global</sys_domain>
+<sys_id>a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5</sys_id>
+<sys_mod_count>4</sys_mod_count>
+<sys_updated_by>fake.admin</sys_updated_by>
+<sys_updated_on>2026-03-23 19:43:26</sys_updated_on>
+<title>Sample - Annual reminder campaign</title>
+<user_reference_table>sys_user</user_reference_table>
+</sn_cd_content_notification>
 </unload>

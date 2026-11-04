@@ -426,8 +426,45 @@
       .filter(Boolean);
   }
 
+  // ---------------------------------------------------------------------
+  // Email sources
+  //
+  // Besides notifications (sysevent_email_action), HR emails come from:
+  //   - HR email content (sn_hr_core_email_content): body + subject used by
+  //     a Lifecycle Event activity; when it sends and who gets it are set
+  //     on that activity, not on this record
+  //   - Content delivery (sn_cd_content_notification): a Content Publishing
+  //     email with the layout built into its body; the schedule and
+  //     audience are set in Content Publishing
+  // Records carry their table in __source (set on import).
+  // ---------------------------------------------------------------------
+
+  const SOURCES = {
+    sysevent_email_action: { label: "Notification", body: "message_html", name: "name" },
+    sn_hr_core_email_content: { label: "HR email content", body: "message_html", name: "name" },
+    sn_cd_content_notification: { label: "Content delivery", body: "rich_text_plain_html", name: "title" },
+  };
+
+  function sourceOf(n) {
+    const t = (n && (n.__source || n.sys_class_name)) || "";
+    return SOURCES[t] ? t : "sysevent_email_action";
+  }
+
   // n: flat object of notification field values.
   function triggerParts(n) {
+    const src = sourceOf(n);
+    if (src === "sn_hr_core_email_content") {
+      return [
+        "sent by an HR Lifecycle Event activity" + (n.type ? ` (${friendlyField(n.type)})` : "") +
+          "; when it sends is set on that activity",
+      ];
+    }
+    if (src === "sn_cd_content_notification") {
+      return [
+        "sent by Content Delivery on the schedule set in Content Publishing" +
+          (n.state ? ` (state: ${upperFirst(String(n.state).toLowerCase())})` : ""),
+      ];
+    }
     const gen = (n.generation_type || "").trim();
     const parts = [];
     if (gen === "event" || (!gen && n.event_name && !isTrue(n.action_insert) && !isTrue(n.action_update))) {
@@ -453,7 +490,15 @@
   function triggerSummary(n, displayValues, opts) {
     const friendly = !!(opts && opts.friendly);
     const cond = translateCondition(n.condition, displayValues, opts);
-    const table = n.collection ? (friendly ? friendlyTable(n.collection) : n.collection) : "(no table)";
+    const src = sourceOf(n);
+    const table =
+      src === "sn_cd_content_notification"
+        ? "Content delivery"
+        : n.collection
+        ? friendly
+          ? friendlyTable(n.collection)
+          : n.collection
+        : "(no table)";
     let s = `${table}: ${triggerParts(n).join(", ")}`;
     if (cond.text) s += `; if ${cond.text}`;
     if (hasAdvancedCondition(n)) s += "; plus custom script logic (ask HRIT)";
@@ -461,6 +506,12 @@
   }
 
   function recipientsSummary(n, opts) {
+    const src = sourceOf(n);
+    if (src === "sn_hr_core_email_content") return "Set on the Lifecycle Event activity that sends it";
+    if (src === "sn_cd_content_notification") {
+      const t = n.user_reference_table;
+      return "The audience chosen in Content Publishing" + (t ? ` (${opts && opts.friendly ? friendlyTable(t) : t} records)` : "");
+    }
     const bits = [];
     const fields = splitList(n.recipient_fields).map((f) => (opts && opts.friendly ? friendlyField(f) : f));
     const users = splitList(n.recipient_users);
@@ -792,6 +843,8 @@
     fillHtml,
     fillText,
     isRelativeUrl,
+    SOURCES,
+    sourceOf,
     friendlyField,
     friendlyTable,
     parseUnloadDate,

@@ -37,7 +37,27 @@ pane updates live as an email preview.
 ## ServiceNow import (notification review for Google Docs / Sheets)
 
 The **ServiceNow import** tab reads ServiceNow XML exports and turns each
-notification into something a process owner can read and comment on:
+notification into something a process owner can read and comment on.
+
+HR emails come from three places, and all three are listed together:
+
+| Source | Table | Body field | When it sends / who receives it |
+| --- | --- | --- | --- |
+| Notification | `sysevent_email_action` | `message_html` (or its template's) | on the record: trigger, condition, recipients |
+| HR email content | `sn_hr_core_email_content` | `message_html` | set on the **Lifecycle Event activity** that uses it |
+| Content delivery | `sn_cd_content_notification` | `rich_text_plain_html` (layout built in) | set in **Content Publishing** (schedule and audience); the record has `state` (Draft badge), `from` and `reply_to` |
+
+HR email content and content delivery records have no category, so they
+group under "HR email content" and "Content delivery" (and so get their
+own Program Doc). Their "When it sends" and "Who receives it" sections say
+where that's configured instead of guessing. Content delivery bodies
+already contain their layout, so the "Simplified layout" Docs option has
+no layout to simplify for them; their Docs copy still gets the general
+tidy-up (no fixed heights, spacer rows or grey wrapper). The Advanced edit
+works on each source's own body field, with the same byte-preserving XML
+download. The inventory has a **Source** column.
+
+For each record:
 
 - a list of notifications, searchable and grouped by category, filterable by
   category, table and active
@@ -211,6 +231,8 @@ column header → **Export → XML**:
 | Email templates | `sysevent_email_template.list` |
 | Email (mail) scripts | `sys_script_email.list` |
 | Email layouts | `sys_email_layout.list` |
+| HR email content | `sn_hr_core_email_content.list` |
+| Content delivery emails | `sn_cd_content_notification.list` |
 
 Only notifications are required. Import the others too so previews show the
 template body, layout and mail script source; anything missing is labelled
