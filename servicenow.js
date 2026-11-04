@@ -781,12 +781,21 @@
   // Exports
   // ------------------------------------------------------------------
 
-  function whenSummary(n) {
-    const parts = [`Table: ${n.f.collection || "(none)"}`, `Trigger: ${C.triggerParts(n.f).join(", ")}`];
-    const t = C.translateCondition(n.f.condition, n.conditionDisplay);
-    parts.push(`Condition: ${t.text || "(none)"}`);
-    if (C.hasAdvancedCondition(n.f)) parts.push("Custom script logic — ask HRIT");
-    return parts.join("\n");
+  // Recipients for a review Doc: owners can't read sys_ids, so users and
+  // groups are counted rather than listed (the full ids are in the app and
+  // the inventory sheet).
+  function recipientsForDocs(n) {
+    const bits = [];
+    const fields = C.splitList(n.f.recipient_fields);
+    const users = C.splitList(n.f.recipient_users).length;
+    const groups = C.splitList(n.f.recipient_groups).length;
+    if (fields.length) bits.push(fields.join(", "));
+    if (users) bits.push(`${users} user${users > 1 ? "s" : ""}`);
+    if (groups) bits.push(`${groups} group${groups > 1 ? "s" : ""}`);
+    if (C.isTrue(n.f.event_parm_1)) bits.push("event parm 1");
+    if (C.isTrue(n.f.event_parm_2)) bits.push("event parm 2");
+    if (C.isTrue(n.f.send_self)) bits.push("event creator");
+    return bits.length ? bits.join("; ") : "(none configured)";
   }
 
   els.copyDocs.addEventListener("click", async () => {
@@ -794,15 +803,13 @@
     if (!n) return;
     const e = effective(n);
     const subject = C.fillText(e.subject, S.sample);
+    // Kept short on purpose - the full config is in the inventory sheet.
     const rows = [
       ["Notification", n.f.name || ""],
       ["Subject", subject],
-      ["When it sends", whenSummary(n)],
-      ["Who receives it", C.recipientsSummary(n.f)],
-      ["Template", n.f.template ? refLabel(n, "template", S.templates) : "(none)"],
-      ["Active", yesNo(n.f.active)],
+      ["When it sends", C.triggerSummary(n.f, n.conditionDisplay)],
+      ["Who receives it", recipientsForDocs(n)],
       ["Last updated", n.f.sys_updated_on || ""],
-      ["sys_id", n.sysId],
     ];
     if (isEdited(n) || isEdited(e.template)) rows.push(["Note", "Contains proposed edits that are not yet in ServiceNow."]);
     // Review Docs get no images at all - each one becomes a [Logo] label.

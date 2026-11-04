@@ -54,8 +54,8 @@ notification into something a process owner can read and comment on:
   `${opened_for.name}` → `Jane Sample`, …). `${mail_script:name}` shows up as a
   **[Dynamic content: name]** box; the script's source appears in a
   collapsible panel for developers and is never executed.
-- **Copy for Google Docs**: a header table (name, subject, when it sends, who
-  receives it, template, active, last updated, sys_id) above the rendered
+- **Copy for Google Docs**: a header table (name, subject, when it sends, who receives it, last
+  updated; users and groups are counted, not listed) above the rendered
   email, for pasting into that notification's tab in the program's Doc. By
   default it uses a **simplified layout**: all of the layout's text is
   kept, but the shape is flattened so the Doc isn't distorted. The rows

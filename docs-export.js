@@ -147,13 +147,13 @@
   // Small two-column table (label | value) - Google Docs keeps simple
   // bordered tables with inline styles intact.
   function headerTable(rows) {
-    const cell = "border:1px solid #c7ced9;padding:4pt 6pt;vertical-align:top;font-family:Arial,sans-serif;font-size:10pt;";
+    const cell = "border:1px solid #dde3ea;padding:2pt 5pt;vertical-align:top;font-family:Arial,sans-serif;font-size:8.5pt;color:#3c4656;";
     return (
       '<table style="border-collapse:collapse;width:100%;margin:0 0 12pt 0;">' +
       rows
         .map(
           ([label, value]) =>
-            `<tr><td style="${cell}background-color:#f1f3f6;font-weight:bold;width:28%;" bgcolor="#f1f3f6">${escapeHtml(label)}</td>` +
+            `<tr><td style="${cell}background-color:#f6f7f9;font-weight:bold;width:20%;white-space:nowrap;" bgcolor="#f6f7f9">${escapeHtml(label)}</td>` +
             `<td style="${cell}">${escapeHtml(value).replace(/\n/g, "<br>")}</td></tr>`
         )
         .join("") +
