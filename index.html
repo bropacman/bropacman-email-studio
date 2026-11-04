@@ -175,7 +175,13 @@
       </div>
       <div class="sn-preview-actions">
         <button type="button" id="snCopyDocs" disabled>Copy for Google Docs</button>
-        <label class="sn-toggle"><input type="checkbox" id="snDocsIncludeLayout" checked> Include layout</label>
+        <label class="sn-toggle">Docs copy includes
+          <select id="snDocsContent">
+            <option value="content" selected>Content area (no banner/footer)</option>
+            <option value="full">Full layout</option>
+            <option value="body">Notification body only</option>
+          </select>
+        </label>
       </div>
       <div class="email-shell">
         <div class="email-meta">

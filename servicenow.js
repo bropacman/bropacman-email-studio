@@ -63,7 +63,7 @@
     advancedToggle: $("snAdvancedToggle"),
     detail: $("snDetail"),
     copyDocs: $("snCopyDocs"),
-    docsIncludeLayout: $("snDocsIncludeLayout"),
+    docsContent: $("snDocsContent"),
     pvFrom: $("sn-pv-from"),
     pvTo: $("sn-pv-to"),
     pvSubject: $("sn-pv-subject"),
@@ -626,9 +626,38 @@
   const PREVIEW_HEAD =
     '<base target="_blank"><meta charset="utf-8"><style>body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1c2430;}</style>';
 
-  function renderedEmail(n, includeLayout) {
+  // The part of a layout worth reviewing in a Doc: the table cell that holds
+  // ${notification:body}. Real layouts often put more content in that same
+  // cell (a headline mail script, a case-details table, a disclaimer) while
+  // the banner, footer and background sit in other rows. The cell's text
+  // styling (font, size, colour) is carried onto a wrapper so the body
+  // still looks like the email. Falls back to the whole layout if the
+  // placeholder isn't inside a cell.
+  function layoutContentArea(layoutHtml) {
+    const marker = "${notification:body}";
+    if (!layoutHtml || !layoutHtml.includes(marker)) return layoutHtml;
+    const doc = new DOMParser().parseFromString(layoutHtml, "text/html");
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode()) && !node.nodeValue.includes(marker));
+    const cell = node && node.parentElement.closest("td, th");
+    if (!cell) return layoutHtml;
+    const textStyle = (cell.getAttribute("style") || "")
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => /^(font-family|font-size|color|line-height)\s*:/i.test(s))
+      .join("; ");
+    return textStyle ? `<div style="${C.escapeHtml(textStyle)}">${cell.innerHTML}</div>` : cell.innerHTML;
+  }
+
+  // mode: "full" (whole layout), "content" (layout's content cell only) or
+  // "body" (just the notification/template body).
+  function renderedEmail(n, mode) {
     const e = effective(n);
-    const html = includeLayout && e.layoutHtml ? C.wrapInLayout(e.layoutHtml, e.body) : e.body;
+    let layout = "";
+    if (e.layoutHtml && mode === "full") layout = e.layoutHtml;
+    else if (e.layoutHtml && mode === "content") layout = layoutContentArea(e.layoutHtml);
+    const html = layout ? C.wrapInLayout(layout, e.body) : e.body;
     return C.fillHtml(html, S.sample);
   }
 
@@ -645,7 +674,7 @@
     els.pvSubject.textContent = C.fillText(e.subject, S.sample) || "(no subject)";
     // Relative image URLs point at the instance and can't load here; show
     // a [Logo] label instead of a broken-image icon. Full URLs still load.
-    const html = C.imagesToPlaceholder(renderedEmail(n, true), C.isRelativeUrl);
+    const html = C.imagesToPlaceholder(renderedEmail(n, "full"), C.isRelativeUrl);
     els.pvFrame.srcdoc = PREVIEW_HEAD + (html || '<p style="color:#6b7688"><em>(empty body)</em></p>');
   }
 
@@ -693,7 +722,7 @@
     ];
     if (isEdited(n) || isEdited(e.template)) rows.push(["Note", "Contains proposed edits that are not yet in ServiceNow."]);
     // Review Docs get no images at all - each one becomes a [Logo] label.
-    const email = await D.prepareForDocs(C.imagesToPlaceholder(renderedEmail(n, els.docsIncludeLayout.checked)));
+    const email = await D.prepareForDocs(C.imagesToPlaceholder(renderedEmail(n, els.docsContent.value)));
     const html = D.headerTable(rows) + email;
     const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + D.htmlToText(email);
     flash(els.copyDocs, (await D.copyRich(html, text)) ? "Copied! Paste into Google Docs" : "Copy failed");

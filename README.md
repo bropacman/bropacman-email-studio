@@ -56,7 +56,13 @@ notification into something a process owner can read and comment on:
   collapsible panel for developers and is never executed.
 - **Copy for Google Docs**: a header table (name, subject, when it sends, who
   receives it, template, active, last updated, sys_id) above the rendered
-  email, for pasting into that notification's tab in the program's Doc
+  email, for pasting into that notification's tab in the program's Doc. By
+  default it includes only the layout's **content area**: the table cell
+  holding `${notification:body}`, which often also holds a headline or
+  case-details table. The banner, footer and background are left out. You
+  can switch to the full layout or the notification body only. Images become
+  a `[Logo]` label, both in the Doc and wherever a relative image URL can't
+  load in the preview.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
   per notification in the current filter (name, category, table, trigger
   summary, recipients summary, active, has advanced condition, uses mail
