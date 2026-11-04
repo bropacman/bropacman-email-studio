@@ -702,7 +702,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .sn-detail details summary { cursor: pointer; font-size: 12px; color: var(--muted); }
-.sn-script { margin-bottom: 6px; }
+.sn-script { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+.sn-script:last-child { border-bottom: 0; }
+.sn-script-name { margin-bottom: 6px; font-size: 12px; }
 
 .sn-sample { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .sn-sample-row,

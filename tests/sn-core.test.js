@@ -268,3 +268,14 @@ test("cover page helpers: export date and safe links", () => {
   assert.equal(C.safeHttpUrl("not a link"), null);
   assert.equal(C.safeHttpUrl(""), null);
 });
+
+test("mail scripts can show a typed-in example instead of the placeholder", () => {
+  const html = "<p>${mail_script:signature}</p><p>${mail_script:other}</p>";
+  const out = C.fillHtml(html, {}, { scriptExamples: { signature: "Thanks,\nHR <Team>", other: "   " } });
+  assert.match(out, /Thanks,<br>HR &lt;Team&gt;<\/span>/);
+  assert.match(out, /dashed/);
+  assert.doesNotMatch(out, /Dynamic content: signature/);
+  // Blank examples (and scripts without one) keep the placeholder box.
+  assert.match(out, /\[Dynamic content: other\]/);
+  assert.match(C.fillHtml(html, {}), /\[Dynamic content: signature\]/);
+});

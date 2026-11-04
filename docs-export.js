@@ -251,7 +251,7 @@
         (r) =>
           "<tr>" +
           r
-            .map((v, i) => `<td style="${cell}${codeFirst && i === 0 ? "font-family:Consolas,'Courier New',monospace;color:#1a4fb5;white-space:nowrap;" : ""}">${escapeHtml(v)}</td>`)
+            .map((v, i) => `<td style="${cell}${codeFirst && i === 0 ? "font-family:Consolas,'Courier New',monospace;color:#1a4fb5;white-space:nowrap;" : ""}">${escapeHtml(v).replace(/\n/g, "<br>")}</td>`)
             .join("") +
           "</tr>"
       )

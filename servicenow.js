@@ -35,6 +35,7 @@
     sample: {}, // variable -> sample value
     meanings: {}, // variable -> plain-English meaning the user typed in
     programs: {}, // category -> { description, ownerGroup, strategyUrl, inventoryUrl, reviewText } for cover pages
+    scriptInfo: {}, // mail script name -> { description, example } typed in by the user
     edits: {}, // sys_id -> { subject?, message_html? }
     selected: null,
     advanced: false,
@@ -67,6 +68,7 @@
     copyDocs: $("snCopyDocs"),
     docsContent: $("snDocsContent"),
     docsShowNames: $("snDocsShowNames"),
+    showScriptExamples: $("snShowScriptExamples"),
     coverHint: $("snCoverHint"),
     coverFields: $("snCoverFields"),
     coverTitle: $("snCoverTitle"),
@@ -557,7 +559,11 @@
   // Format: { values, meanings, programs }. A flat { variable: value }
   // object (the first sample-data format) still imports.
   function exportSettingsFile() {
-    const data = { values: S.sample, meanings: S.meanings, programs: S.programs };
+    const mailScripts = {};
+    Object.entries(S.scriptInfo).forEach(([name, info]) => {
+      if (info && (info.description || info.example)) mailScripts[name] = { description: info.description || "", example: info.example || "" };
+    });
+    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts };
     D.download("email-studio-settings.json", JSON.stringify(data, null, 2) + "\n", "application/json");
   }
 
@@ -565,7 +571,7 @@
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
-      const isNew = data.values || data.meanings || data.programs;
+      const isNew = data.values || data.meanings || data.programs || data.mailScripts;
       Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
       Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
       Object.entries(isNew ? data.programs || {} : {}).forEach(([cat, p]) => {
@@ -575,11 +581,33 @@
           if (p[k] != null) target[k] = String(p[k]);
         });
       });
+      Object.entries(isNew ? data.mailScripts || {} : {}).forEach(([name, info]) => {
+        if (!info || typeof info !== "object") return;
+        const target = scriptInfoFor(name);
+        if (info.description != null) target.description = String(info.description);
+        if (info.example != null) target.example = String(info.example);
+      });
       renderSelected();
       updateCoverPanel(true);
     } catch (err) {
       alert("Could not read settings: " + err.message);
     }
+  }
+
+  // Returns (creating if needed) the typed-in info for a mail script. The
+  // entry is dropped again by the field handlers once both fields are empty.
+  function scriptInfoFor(name) {
+    return (S.scriptInfo[name] = S.scriptInfo[name] || { description: "", example: "" });
+  }
+
+  // name -> example text, for scripts that have one, when the toggle is on.
+  function scriptExamples() {
+    if (!els.showScriptExamples.checked) return null;
+    const out = {};
+    Object.entries(S.scriptInfo).forEach(([name, info]) => {
+      if (info && String(info.example || "").trim()) out[name] = info.example;
+    });
+    return out;
   }
 
   function mailScriptSection(n) {
@@ -588,14 +616,40 @@
     if (!mailScripts.length) return null;
     return section(
       "Mail scripts",
-      h("p", { class: "muted" }, "Shown as [Dynamic content: name] in the preview. Source is for developers; it is never executed here."),
+      h(
+        "p",
+        { class: "muted" },
+        "Scripts are never executed here. Describe what each one does and type an example of its output: the example replaces " +
+          "the [Dynamic content] box in the preview and the Google Docs copy (in a dashed outline), and both are listed in the " +
+          "Docs copy's Mail scripts table. Saved with the settings JSON."
+      ),
       mailScripts.map((name) => {
         const s = S.scriptsByName.get(name);
+        const info = scriptInfoFor(name);
+        const onField = (key) => (ev) => {
+          info[key] = ev.target.value;
+          if (!info.description && !info.example) delete S.scriptInfo[name];
+          if (key === "example") schedulePreview();
+        };
         return h(
-          "details",
+          "div",
           { class: "sn-script" },
-          h("summary", null, code(name), s ? "" : h("span", { class: "muted" }, " (not in imported files)")),
-          s ? h("pre", null, s.f.script || "") : h("p", { class: "muted" }, "Export sys_script_email to see this script's source.")
+          h("div", { class: "sn-script-name" }, code(name), s ? "" : h("span", { class: "muted" }, " (source not in imported files)")),
+          h(
+            "label",
+            { class: "sn-field" },
+            "What it does",
+            h("input", { type: "text", value: info.description || "", placeholder: "e.g. Signature block for the HR case team", oninput: onField("description") })
+          ),
+          h(
+            "label",
+            { class: "sn-field" },
+            "Example output",
+            h("textarea", { rows: 2, placeholder: "e.g. Thanks, HR Shared Services", oninput: onField("example") }, info.example || "")
+          ),
+          s
+            ? h("details", { class: "sn-raw" }, h("summary", null, "Script source (developers)"), h("pre", null, s.f.script || ""))
+            : h("p", { class: "muted" }, "Export sys_script_email to see this script's source.")
         );
       })
     );
@@ -791,9 +845,11 @@
     els.pvSubject.textContent = C.fillText(e.subject, S.sample) || "(no subject)";
     // Relative image URLs point at the instance and can't load here; show
     // a [Logo] label instead of a broken-image icon. Full URLs still load.
-    const html = C.imagesToPlaceholder(renderedEmail(n, "full"), C.isRelativeUrl);
+    const html = C.imagesToPlaceholder(renderedEmail(n, "full", { scriptExamples: scriptExamples() }), C.isRelativeUrl);
     els.pvFrame.srcdoc = PREVIEW_HEAD + (html || '<p style="color:#6b7688"><em>(empty body)</em></p>');
   }
+
+  els.showScriptExamples.addEventListener("change", renderPreview);
 
   els.pvFrame.addEventListener("load", () => {
     try {
@@ -867,18 +923,30 @@
       ["Subject", subject],
     ];
     // Review Docs get no images at all - each one becomes a [Logo] label.
-    const email = await D.prepareForDocs(C.imagesToPlaceholder(renderedEmail(n, els.docsContent.value, { showNames })));
+    const email = await D.prepareForDocs(
+      C.imagesToPlaceholder(renderedEmail(n, els.docsContent.value, { showNames, scriptExamples: scriptExamples() }))
+    );
     // Every ${variable} the email uses, with its meaning and example value.
     const { variables } = C.findVariables(e.subject + "\n" + e.body + "\n" + e.layoutHtml);
     const varRows = variables.map((v) => ["${" + v + "}", S.meanings[v] || "", S.sample[v] != null ? S.sample[v] : C.defaultSampleValue(v)]);
     const varTable = varRows.length ? D.gridTable(["Variable", "Meaning", "Example"], varRows, { codeFirstColumn: true }) : "";
-    const html = notificationHeading(title) + D.headerTable(rows) + varTable + D.headerTable(emailHead) + email;
+    // Every mail script the email uses, with what it does and an example.
+    const { mailScripts } = C.findVariables(e.subject + "\n" + e.body + "\n" + e.layoutHtml);
+    const scriptRows = mailScripts.map((name) => {
+      const info = S.scriptInfo[name] || {};
+      return [name, info.description || "", info.example || ""];
+    });
+    const scriptTable = scriptRows.length ? D.gridTable(["Mail script", "What it does", "Example output"], scriptRows, { codeFirstColumn: true }) : "";
+    const html = notificationHeading(title) + D.headerTable(rows) + varTable + scriptTable + D.headerTable(emailHead) + email;
     const kvText = (list) => list.map(([k, v]) => `${k}: ${v}`).join("\n");
     const text =
       title +
       "\n\n" +
       kvText(rows) +
       (varRows.length ? "\n\nVariables:\n" + varRows.map(([v, m, x]) => `${v}${m ? " - " + m : ""} (e.g. ${x})`).join("\n") : "") +
+      (scriptRows.length
+        ? "\n\nMail scripts:\n" + scriptRows.map(([s, d, x]) => `${s}${d ? " - " + d : ""}${x ? " (e.g. " + x.replace(/\s+/g, " ") + ")" : ""}`).join("\n")
+        : "") +
       "\n\n" +
       kvText(emailHead) +
       "\n\n" +
