@@ -146,7 +146,9 @@ For each record:
   The Doc's outline then lists every notification at full length. For
   clickable links, put the cursor on the cover's tip line and use
   **Insert → Table of contents**. Pasted content can't create Docs
-  bookmarks or heading links itself. **Copy cover page only** and each
+  bookmarks or heading links itself. **Copy notifications only (no
+  cover)** gives the same numbered notifications without the cover, for a
+  Doc that has its own intro or already has the cover. **Copy cover page only** and each
   notification's own **Copy for Google Docs** (which includes its heading)
   are there for re-pasting one updated piece.
 

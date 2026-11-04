@@ -89,6 +89,7 @@
     coverLinkStatus: $("snCoverLinkStatus"),
     copyCover: $("snCopyCover"),
     copyProgram: $("snCopyProgram"),
+    copyNotificationsOnly: $("snCopyNotificationsOnly"),
     programSeparator: $("snProgramSeparator"),
     exportSettings: $("snExportSettings"),
     importSettings: $("snImportSettings"),
@@ -1663,34 +1664,41 @@
     flash(els.copyCover, (await D.copyRich(html, text)) ? "Copied! Paste at the top of the Doc" : "Copy failed");
   });
 
-  // The whole program as one Doc: cover, then every notification of the
-  // category under a numbered heading (same numbering and order as the
-  // cover's list), separated by a divider line or a page break.
-  els.copyProgram.addEventListener("click", async () => {
+  // The whole program as one Doc: cover (unless withCover is false), then
+  // every notification of the category under a numbered heading (same
+  // numbering and order as the cover's list), separated by a divider line
+  // or a page break.
+  async function copyProgram(btn, withCover) {
     const cat = coverCategory;
     if (!cat) return;
-    const original = els.copyProgram.textContent;
-    els.copyProgram.disabled = true;
-    els.copyProgram.textContent = "Building...";
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Building...";
     try {
-      const cover = coverDocs(cat);
-      const parts = [cover.html];
-      const texts = [cover.text];
-      for (const [i, n] of cover.items.entries()) {
+      const cover = withCover ? coverDocs(cat) : null;
+      const items = cover ? cover.items : coverData(cat).items;
+      const parts = cover ? [cover.html] : [];
+      const texts = cover ? [cover.text] : [];
+      const separator = SEPARATORS[els.programSeparator.value] || SEPARATORS.divider;
+      for (const [i, n] of items.entries()) {
         const one = await notificationDocs(n, `${i + 1}. ${n.f.name || n.sysId}`);
-        parts.push((SEPARATORS[els.programSeparator.value] || SEPARATORS.divider) + one.html);
+        parts.push((parts.length ? separator : "") + one.html);
         texts.push(one.text);
       }
       const ok = await D.copyRich(parts.join("\n"), texts.join("\n\n----------\n\n"));
-      els.copyProgram.textContent = original;
-      els.copyProgram.disabled = false;
-      flash(els.copyProgram, ok ? `Copied cover + ${cover.items.length} notifications` : "Copy failed");
+      btn.textContent = original;
+      btn.disabled = false;
+      const what = `${items.length} notification${items.length === 1 ? "" : "s"}`;
+      flash(btn, ok ? (cover ? `Copied cover + ${what}` : `Copied ${what}`) : "Copy failed");
     } catch (err) {
-      els.copyProgram.textContent = original;
-      els.copyProgram.disabled = false;
+      btn.textContent = original;
+      btn.disabled = false;
       alert("Could not build the program copy: " + err.message);
     }
-  });
+  }
+
+  els.copyProgram.addEventListener("click", () => copyProgram(els.copyProgram, true));
+  els.copyNotificationsOnly.addEventListener("click", () => copyProgram(els.copyNotificationsOnly, false));
 
   els.exportSettings.addEventListener("click", exportSettingsFile);
   els.importSettings.addEventListener("click", () => els.importSettingsInput.click());

@@ -646,6 +646,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sn-cover-title { font-weight: 700; font-size: 13px; }
 #snCopyGlossary { width: 100%; margin-bottom: 4px; }
 .sn-cover #snCopyProgram,
+.sn-cover #snCopyNotificationsOnly,
 .sn-cover #snCopyCover { width: 100%; margin-bottom: 4px; }
 .sn-cover-status { display: block; }
 
