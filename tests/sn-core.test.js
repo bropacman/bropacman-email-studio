@@ -1,4 +1,4 @@
-// Run with:  node --test tests/
+// Run with:  node --test tests/*.test.js
 // Uses only Node's built-in test runner - no dependencies to install.
 "use strict";
 
@@ -191,4 +191,41 @@ test("CSV escapes quotes and guards formulas", () => {
   const csv = C.toCsv([["a", 'b "c"'], ["=SUM(1)", "-x"]]);
   assert.equal(csv, '﻿"a","b ""c"""\r\n"\'=SUM(1)","\'-x"\r\n');
   assert.equal(C.toTsv([["a\tb", "c\nd"]]), "a b\tc d\n");
+});
+
+test("condition fields with <item> children read as just the encoded query", () => {
+  const u = C.splitUnload(combined);
+  const r = u.records.find((x) => x.raw.includes("<sys_id>4d5e6f708192a3b4c5d6e7f8091a2b3c</sys_id>"));
+  assert.ok(r.raw.includes("<item "));
+  assert.equal(
+    C.readField(r.raw, "condition"),
+    "assigned_toVALCHANGES^assigned_toISNOTEMPTY^hr_service=9f8e7d6c5b4a39281706f5e4d3c2b1a0^EQ"
+  );
+  // The nested items don't confuse field boundaries for later fields.
+  assert.equal(C.readField(r.raw, "sys_id"), "4d5e6f708192a3b4c5d6e7f8091a2b3c");
+  assert.deepEqual(
+    C.conditionDisplayValues([{ field: "hr_service", operator: "=", value: "abc", display_value: "General Inquiry" }]),
+    { "hr_service|=|abc": "General Inquiry" }
+  );
+  assert.equal(
+    C.translateCondition("hr_service=abc^active=true", { "hr_service|=|abc": "General Inquiry" }).text,
+    'hr_service is "abc" (General Inquiry) AND active is "true"'
+  );
+});
+
+test("editing a CDATA field keeps it as CDATA", () => {
+  const raw = C.splitUnload(single).records[0].raw;
+  assert.ok(raw.includes("<message_html><![CDATA["));
+  const edited = C.replaceField(raw, "message_html", "<p>New & improved</p>");
+  assert.ok(edited.includes("<message_html><![CDATA[<p>New & improved</p>]]></message_html>"));
+  // A value containing ]]> can't go in CDATA, so it falls back to escaping.
+  const tricky = C.replaceField(raw, "message_html", "a ]]> b");
+  assert.ok(tricky.includes("<message_html>a ]]&gt; b</message_html>"));
+  assert.equal(C.readField(tricky, "message_html"), "a ]]> b");
+});
+
+test("fixtures/demo-data.js is in sync with the XML fixture", () => {
+  const src = fs.readFileSync(path.join(FIXTURES, "demo-data.js"), "utf8");
+  const json = /window\.SN_DEMO_XML = (".*");\s*$/.exec(src)[1];
+  assert.equal(JSON.parse(json), combined.replace(/\r\n/g, "\n"), "run: node scripts/build-demo-data.js");
 });

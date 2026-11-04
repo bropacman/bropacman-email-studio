@@ -86,7 +86,11 @@ ${mail_script:case_summary_table}
 <advanced_condition/>
 <category display_value="Sample HR Case">5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d</category>
 <collection>sn_hr_core_case</collection>
-<condition>assigned_toVALCHANGES^assigned_toISNOTEMPTY^EQ</condition>
+<condition table="sn_hr_core_case">assigned_toVALCHANGES^assigned_toISNOTEMPTY^hr_service=9f8e7d6c5b4a39281706f5e4d3c2b1a0^EQ<item goto="false" or="false" field="assigned_to" endquery="false" value="" operator="VALCHANGES" newquery="false"/>
+<item goto="false" or="false" field="assigned_to" endquery="false" value="" operator="ISNOTEMPTY" newquery="false"/>
+<item goto="false" or="false" field="hr_service" endquery="false" value="9f8e7d6c5b4a39281706f5e4d3c2b1a0" operator="=" newquery="false" display_table="sn_hr_core_service" display_value="Sample General Inquiry"/>
+<item goto="false" or="false" field="" endquery="true" value="" operator="=" newquery="false"/>
+</condition>
 <description>FAKE DEMO DATA. Tells the agent a case is now theirs.</description>
 <event_name/>
 <event_parm_1>false</event_parm_1>
@@ -126,10 +130,10 @@ ${mail_script:case_summary_table}
 <event_parm_2>false</event_parm_2>
 <from>Sample HR &lt;hr-noreply@example.invalid&gt;</from>
 <generation_type>engine</generation_type>
-<message_html>&lt;p&gt;Welcome, ${subject_person.first_name}!&lt;/p&gt;
-&lt;p&gt;Your start date is &lt;strong&gt;${subject_person.u_start_date}&lt;/strong&gt;. Your manager, ${subject_person.manager.name}, will meet you on day one.&lt;/p&gt;
-&lt;p&gt;&lt;img src="https://images.example.invalid/welcome-banner.png" alt="Welcome banner" width="400"&gt;&lt;/p&gt;
-&lt;p&gt;Before you start, please ${mail_script:hr_portal_link} and complete your checklist.&lt;/p&gt;</message_html>
+<message_html><![CDATA[<p>Welcome, ${subject_person.first_name}!</p>
+<p>Your start date is <strong>${subject_person.u_start_date}</strong>. Your manager, ${subject_person.manager.name}, will meet you on day one.</p>
+<p><img src="https://images.example.invalid/welcome-banner.png" alt="Welcome banner" width="400"></p>
+<p>Before you start, please ${mail_script:hr_portal_link} and complete your checklist.</p>]]></message_html>
 <name>Sample - Onboarding welcome</name>
 <recipient_fields>subject_person,opened_for</recipient_fields>
 <recipient_groups>7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f</recipient_groups>

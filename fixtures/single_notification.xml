@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="UTF-8"?><unload unload_date="2026-10-28 17:45:02">
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2026-10-28 17:45:02">
 <sysevent_email_action action="INSERT_OR_UPDATE">
 <action_insert>true</action_insert>
 <action_update>false</action_update>
@@ -13,10 +14,10 @@
 <event_parm_2>false</event_parm_2>
 <from>Sample HR &lt;hr-noreply@example.invalid&gt;</from>
 <generation_type>engine</generation_type>
-<message_html>&lt;p&gt;Welcome, ${subject_person.first_name}!&lt;/p&gt;
-&lt;p&gt;Your start date is &lt;strong&gt;${subject_person.u_start_date}&lt;/strong&gt;. Your manager, ${subject_person.manager.name}, will meet you on day one.&lt;/p&gt;
-&lt;p&gt;&lt;img src="https://images.example.invalid/welcome-banner.png" alt="Welcome banner" width="400"&gt;&lt;/p&gt;
-&lt;p&gt;Before you start, please ${mail_script:hr_portal_link} and complete your checklist.&lt;/p&gt;</message_html>
+<message_html><![CDATA[<p>Welcome, ${subject_person.first_name}!</p>
+<p>Your start date is <strong>${subject_person.u_start_date}</strong>. Your manager, ${subject_person.manager.name}, will meet you on day one.</p>
+<p><img src="https://images.example.invalid/welcome-banner.png" alt="Welcome banner" width="400"></p>
+<p>Before you start, please ${mail_script:hr_portal_link} and complete your checklist.</p>]]></message_html>
 <name>Sample - Onboarding welcome</name>
 <recipient_fields>subject_person,opened_for</recipient_fields>
 <recipient_groups>7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f</recipient_groups>

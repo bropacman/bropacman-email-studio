@@ -136,11 +136,33 @@
     const re = /<!\[CDATA\[([\s\S]*?)\]\]>/g;
     let last = 0;
     let m;
+    // Outside CDATA, any "<" is markup (text content has it escaped), e.g.
+    // the <item .../> children ServiceNow appends inside <condition>. Only
+    // the field's own text is wanted, so drop those child elements.
+    let hadChildren = false;
+    const text = (seg) =>
+      decodeEntities(
+        seg.replace(/<[^>]*>/g, () => {
+          hadChildren = true;
+          return "";
+        })
+      );
     while ((m = re.exec(s))) {
-      out += decodeEntities(s.slice(last, m.index)) + m[1];
+      out += text(s.slice(last, m.index)) + m[1];
       last = re.lastIndex;
     }
-    return out + decodeEntities(s.slice(last));
+    out += text(s.slice(last));
+    return hadChildren ? out.trim() : out;
+  }
+
+  // Reads display labels ServiceNow stores on the <item> children of a
+  // <condition> field, keyed "field|operator|value" -> display_value.
+  function conditionDisplayValues(items) {
+    const map = {};
+    (items || []).forEach((it) => {
+      if (it.display_value) map[`${it.field}|${it.operator}|${it.value}`] = it.display_value;
+    });
+    return map;
   }
 
   function decodeEntities(s) {
@@ -184,7 +206,11 @@
     } else {
       let openTag = raw.slice(f.start, f.openEnd);
       if (f.selfClosing) openTag = openTag.replace(/\s*\/>$/, ">");
-      replacement = openTag + escapeXmlText(v) + `</${name}>`;
+      // ServiceNow exports HTML/script fields as CDATA; keep that style when
+      // the original used it so the diff in the downloaded file stays small.
+      const wasCdata = !f.selfClosing && raw.startsWith("<![CDATA[", f.openEnd);
+      const body = wasCdata && !v.includes("]]>") ? `<![CDATA[${v}]]>` : escapeXmlText(v);
+      replacement = openTag + body + `</${name}>`;
     }
     return raw.slice(0, f.start) + replacement + raw.slice(f.end);
   }
@@ -255,18 +281,22 @@
     return v.split("@")[0];
   }
 
-  function translateTerm(term) {
+  // displayValues (optional): labels the export itself carried for
+  // reference values, keyed "field|operator|value" (see
+  // conditionDisplayValues). Field names are never relabelled.
+  function translateTerm(term, displayValues) {
     const m = OP_RE.exec(term);
     if (!m) return { field: null, text: `(untranslated: ${term})`, raw: term };
     const [, field, op, value] = m;
     const fn = OPERATORS.find(([o]) => o === op)[1];
-    return { field, op, value, text: `${field} ${fn(value)}`, raw: term };
+    const label = displayValues && displayValues[`${field}|${op}|${value}`];
+    return { field, op, value, label, text: `${field} ${fn(value)}` + (label ? ` (${label})` : ""), raw: term };
   }
 
   // Returns { queries: [ [ [term, ...OR'd], ...AND'd ], ...NQ OR'd ], text, notes }.
   // ^OR binds tighter than ^ (a^ORb^c means (a OR b) AND c), and ^NQ starts a
   // whole new query that is OR'd with the previous ones.
-  function translateCondition(encoded) {
+  function translateCondition(encoded, displayValues) {
     const src = (encoded || "").trim();
     if (!src) return { queries: [], text: "", notes: [] };
     const notes = [];
@@ -281,10 +311,10 @@
           return;
         }
         if (idx > 0 && /^OR(?![A-Z]*BY)/.test(tok) && clauses.length) {
-          clauses[clauses.length - 1].push(translateTerm(tok.slice(2)));
+          clauses[clauses.length - 1].push(translateTerm(tok.slice(2), displayValues));
           return;
         }
-        clauses.push([translateTerm(tok)]);
+        clauses.push([translateTerm(tok, displayValues)]);
       });
       return clauses;
     });
@@ -335,8 +365,8 @@
     return !!(n.advanced_condition || "").trim();
   }
 
-  function triggerSummary(n) {
-    const cond = translateCondition(n.condition);
+  function triggerSummary(n, displayValues) {
+    const cond = translateCondition(n.condition, displayValues);
     let s = `${n.collection || "(no table)"}: ${triggerParts(n).join(", ")}`;
     if (cond.text) s += `; if ${cond.text}`;
     if (hasAdvancedCondition(n)) s += "; plus custom script logic (ask HRIT)";
@@ -482,6 +512,7 @@
     buildUnloadXml,
     escapeXmlText,
     decodeXmlText,
+    conditionDisplayValues,
     translateCondition,
     translateTerm,
     triggerParts,
