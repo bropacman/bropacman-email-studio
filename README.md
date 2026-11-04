@@ -79,16 +79,27 @@ notification into something a process owner can read and comment on:
   `calc()` font sizes (this also applies to the Composer tab's Docs copy).
   Images become a `[Logo]` label, both in the Doc and wherever a relative
   image URL can't load in the preview.
-- **Program cover page** (sidebar, under the exports): pick a category in
-  the filter, then **Copy cover page for Google Docs** and paste it into
-  the program Doc's first tab. It has:
-  - a summary table: program, process owner group, links to the strategy
-    doc and inventory sheet, the notification count (total / active /
-    inactive / with custom script logic), and the export date
-  - "About this program" (strategy and description) and "How to review",
-    which comes with default text you can edit
-  - a numbered list of the category's notifications (when each sends,
-    active, last updated), in the order to arrange the Doc's tabs
+- **Program Doc** (sidebar, under the exports): one Google Doc per
+  program, on a single page. Headings replace tabs, because Docs tab names
+  cut off early. Pick a category in the filter, then **Copy whole program
+  for Google Docs** and paste into an empty Doc. It contains:
+  - the **cover**: the program title (Heading 1) and a summary table
+    (program, process owner group, links to the strategy doc and inventory
+    sheet, the notification count (total / active / inactive / with custom
+    script logic), and the export date). Then "About this program"
+    (strategy and description), "How to review" (default text you can
+    edit), and a numbered list of the category's notifications.
+  - **every notification** in that order, each under a numbered Heading 2
+    ("1. HR Case opened…") with its tables and email. They're separated by
+    a **divider line** (the default, which works in pageless Docs) or a
+    **page break** (for paged or printed Docs).
+
+  The Doc's outline then lists every notification at full length. For
+  clickable links, put the cursor on the cover's tip line and use
+  **Insert → Table of contents**. Pasted content can't create Docs
+  bookmarks or heading links itself. **Copy cover page only** and each
+  notification's own **Copy for Google Docs** (which includes its heading)
+  are there for re-pasting one updated piece.
 
   ServiceNow doesn't hold the description, owner group or links, so you
   type them per category. Only http(s) links are used; anything else is
@@ -163,10 +174,9 @@ with the same sys_id in a later file replaces the earlier one.
 2. **Preview**: open this tool, go to **ServiceNow import**, drop the files.
    Check the summaries; adjust sample data if needed.
 3. **Paste to Google**: import your settings JSON if you have one. Filter
-   to the program's category, then **Copy cover page for Google Docs** →
-   paste it into the Doc's first tab. Then for each notification,
-   **Copy for Google Docs** → paste into its own tab, in the cover's
-   order. **Copy inventory for Google Sheets** →
+   to the program's category, then **Copy whole program for Google Docs** →
+   paste into the program's Doc (pageless works well), and optionally
+   insert a table of contents. **Copy inventory for Google Sheets** →
    paste into the inventory sheet (or import the CSV).
 4. **Owners comment** on wording in the Doc.
 5. **Apply approved changes**: re-import the XML, turn on **Advanced**, and
