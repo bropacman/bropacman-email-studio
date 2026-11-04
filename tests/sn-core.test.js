@@ -229,3 +229,17 @@ test("fixtures/demo-data.js is in sync with the XML fixture", () => {
   const json = /window\.SN_DEMO_XML = (".*");\s*$/.exec(src)[1];
   assert.equal(JSON.parse(json), combined.replace(/\r\n/g, "\n"), "run: node scripts/build-demo-data.js");
 });
+
+test("images become a [Logo] label (all, or only relative URLs)", () => {
+  const html =
+    '<td><img src="/sys_attachment.do?sys_id=1" alt="Beacon"> HR</td>' +
+    "<p><img src='https://cdn.example.com/x.png' alt='x'><img src=logo.pngx></p>";
+  assert.equal(C.imagesToPlaceholder(html), "<td><span>[Logo]</span> HR</td><p><span>[Logo]</span><span>[Logo]</span></p>");
+  assert.equal(
+    C.imagesToPlaceholder(html, C.isRelativeUrl),
+    "<td><span>[Logo]</span> HR</td><p><img src='https://cdn.example.com/x.png' alt='x'><span>[Logo]</span></p>"
+  );
+  assert.equal(C.isRelativeUrl("data:image/png;base64,AA"), false);
+  assert.equal(C.isRelativeUrl("//cdn.example.com/a.png"), false);
+  assert.equal(C.isRelativeUrl("assets/banner.png"), true);
+});

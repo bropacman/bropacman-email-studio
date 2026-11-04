@@ -643,7 +643,10 @@
     els.pvFrom.textContent = n.f.from || DEFAULT_FROM;
     els.pvTo.textContent = C.recipientsSummary(n.f);
     els.pvSubject.textContent = C.fillText(e.subject, S.sample) || "(no subject)";
-    els.pvFrame.srcdoc = PREVIEW_HEAD + (renderedEmail(n, true) || '<p style="color:#6b7688"><em>(empty body)</em></p>');
+    // Relative image URLs point at the instance and can't load here; show
+    // a [Logo] label instead of a broken-image icon. Full URLs still load.
+    const html = C.imagesToPlaceholder(renderedEmail(n, true), C.isRelativeUrl);
+    els.pvFrame.srcdoc = PREVIEW_HEAD + (html || '<p style="color:#6b7688"><em>(empty body)</em></p>');
   }
 
   els.pvFrame.addEventListener("load", () => {
@@ -689,7 +692,8 @@
       ["sys_id", n.sysId],
     ];
     if (isEdited(n) || isEdited(e.template)) rows.push(["Note", "Contains proposed edits that are not yet in ServiceNow."]);
-    const email = await D.prepareForDocs(renderedEmail(n, els.docsIncludeLayout.checked));
+    // Review Docs get no images at all - each one becomes a [Logo] label.
+    const email = await D.prepareForDocs(C.imagesToPlaceholder(renderedEmail(n, els.docsIncludeLayout.checked)));
     const html = D.headerTable(rows) + email;
     const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + D.htmlToText(email);
     flash(els.copyDocs, (await D.copyRich(html, text)) ? "Copied! Paste into Google Docs" : "Copy failed");

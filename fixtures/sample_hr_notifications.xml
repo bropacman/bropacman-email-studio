@@ -5,7 +5,7 @@
 &lt;tbody&gt;&lt;tr&gt;&lt;td&gt;
 &lt;table style="width: 100%; max-width: 640px; margin: auto; border: 1px solid #cbcbcb; background-color: #ffffff;"&gt;
 &lt;tbody&gt;
-&lt;tr&gt;&lt;td style="background-color: #288be4; color: #ffffff; padding: 16px 20px; font-family: Arial, sans-serif; font-size: 20px;"&gt;&lt;strong&gt;Sample HR Services&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
+&lt;tr&gt;&lt;td style="background-color: #288be4; color: #ffffff; padding: 16px 20px; font-family: Arial, sans-serif; font-size: 20px;"&gt;&lt;img src="/sys_attachment.do?sys_id=aa11bb22cc33dd44ee55ff6600112233" alt="Sample logo" height="32"&gt; &lt;strong&gt;Sample HR Services&lt;/strong&gt;&lt;/td&gt;&lt;/tr&gt;
 &lt;tr&gt;&lt;td style="padding: 20px; font-family: Georgia, serif; font-size: 15px; color: #091f2f;"&gt;${notification:body}&lt;/td&gt;&lt;/tr&gt;
 &lt;tr&gt;&lt;td style="padding: 12px 20px; font-family: Arial, sans-serif; font-size: 12px; color: #6b7688; border-top: 1px solid #e1e5ea;"&gt;This is an automated message. Questions? ${mail_script:hr_portal_link}&lt;/td&gt;&lt;/tr&gt;
 &lt;/tbody&gt;
