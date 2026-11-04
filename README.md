@@ -54,18 +54,31 @@ notification into something a process owner can read and comment on:
   `${opened_for.name}` → `Jane Sample`, …). `${mail_script:name}` shows up as a
   **[Dynamic content: name]** box; the script's source appears in a
   collapsible panel for developers and is never executed.
-- **Copy for Google Docs**: a header table (name, subject, when it sends, who receives it, last
-  updated; users and groups are counted, not listed) above the rendered
-  email, for pasting into that notification's tab in the program's Doc. By
-  default it uses a **simplified layout**: all of the layout's text is
+- **Copy for Google Docs**: for pasting into that notification's tab in
+  the program's Doc. In order:
+  1. a small table (notification name, when it sends, last updated)
+  2. a **Variables** table: each `${variable}` the email uses, the meaning
+     you typed for it in the Sample data panel, and an example value
+  3. the email's From / To / Subject (users and groups are counted, not
+     listed by sys_id)
+  4. the email itself
+
+  Variables show by name (as `${opened_for.first_name}` chips), so readers
+  learn what each one is. Untick "Show ${variable} names" to get sample
+  values instead. Meanings are kept in memory and included in the sample
+  data JSON export/import, so you can write them once and reload them. By
+  default the email uses a **simplified layout**: all of the layout's text is
   kept, but the shape is flattened so the Doc isn't distorted. The rows
   above the body become one plain colored banner. The row holding
   `${notification:body}` keeps its full content (headline, details table,
   disclaimer, body, signature). The rows below become footer text under a
   thin line. The background, spacer rows and fixed sizes are dropped. You
-  can switch to the full layout or the notification body only. Images become
-  a `[Logo]` label, both in the Doc and wherever a relative image URL can't
-  load in the preview.
+  can switch to the full layout or the notification body only. In every
+  mode the copy is tidied for Docs: spacer rows/tables and background
+  wrapper tables are removed, along with fixed heights, pixel widths and
+  `calc()` font sizes (this also applies to the Composer tab's Docs copy).
+  Images become a `[Logo]` label, both in the Doc and wherever a relative
+  image URL can't load in the preview.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
   per notification in the current filter (name, category, table, trigger
   summary, recipients summary, active, has advanced condition, uses mail

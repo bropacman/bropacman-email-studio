@@ -243,3 +243,11 @@ test("images become a [Logo] label (all, or only relative URLs)", () => {
   assert.equal(C.isRelativeUrl("//cdn.example.com/a.png"), false);
   assert.equal(C.isRelativeUrl("assets/banner.png"), true);
 });
+
+test("fillHtml can show ${variable} names instead of sample values", () => {
+  const out = C.fillHtml("<p>${number} for ${opened_for.name} ${mail_script:x}</p>", { number: "HRC1" }, { showNames: true });
+  assert.match(out, />\$\{number\}<\/span>/);
+  assert.match(out, />\$\{opened_for\.name\}<\/span>/);
+  assert.doesNotMatch(out, /HRC1/);
+  assert.match(out, /\[Dynamic content: x\]/);
+});

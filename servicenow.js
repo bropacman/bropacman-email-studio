@@ -33,6 +33,7 @@
     scripts: new Map(), // keyed by sys_id
     scriptsByName: new Map(),
     sample: {}, // variable -> sample value
+    meanings: {}, // variable -> plain-English meaning the user typed in
     edits: {}, // sys_id -> { subject?, message_html? }
     selected: null,
     advanced: false,
@@ -64,6 +65,7 @@
     detail: $("snDetail"),
     copyDocs: $("snCopyDocs"),
     docsContent: $("snDocsContent"),
+    docsShowNames: $("snDocsShowNames"),
     pvFrom: $("sn-pv-from"),
     pvTo: $("sn-pv-to"),
     pvSubject: $("sn-pv-subject"),
@@ -465,15 +467,26 @@
     });
     const rows = variables.map((v) =>
       h(
-        "label",
+        "div",
         { class: "sn-sample-row" },
         code("${" + v + "}"),
         h("input", {
           type: "text",
+          "aria-label": `Sample value for ${v}`,
           value: S.sample[v],
           oninput: (ev) => {
             S.sample[v] = ev.target.value;
             schedulePreview();
+          },
+        }),
+        h("input", {
+          type: "text",
+          "aria-label": `Meaning of ${v}`,
+          placeholder: "Meaning (shown in Google Docs)",
+          value: S.meanings[v] || "",
+          oninput: (ev) => {
+            if (ev.target.value.trim()) S.meanings[v] = ev.target.value;
+            else delete S.meanings[v];
           },
         })
       )
@@ -489,7 +502,11 @@
         try {
           const data = JSON.parse(await file.text());
           if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
-          Object.entries(data).forEach(([k, v]) => (S.sample[k] = String(v)));
+          // Current format: { values: {...}, meanings: {...} }. A flat
+          // { variable: value } object (the earlier format) also works.
+          const isNew = data.values || data.meanings;
+          Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
+          Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
           renderSelected();
         } catch (err) {
           alert("Could not read sample data: " + err.message);
@@ -498,12 +515,18 @@
     });
     return section(
       "Sample data",
-      h("p", { class: "muted" }, "Fake values used for ${variables} in this preview. Shared across all notifications; kept in memory only."),
+      h(
+        "p",
+        { class: "muted" },
+        "Fake values used for ${variables} in this preview, and an optional meaning for each that's listed in the Google Docs copy. " +
+          "Shared across all notifications; kept in memory only - export the JSON to reuse them next time."
+      ),
+      rows.length ? h("div", { class: "sn-sample-head" }, h("span", null, "Variable"), h("span", null, "Sample value"), h("span", null, "Meaning")) : null,
       rows.length ? h("div", { class: "sn-sample" }, rows) : h("p", { class: "muted" }, "This notification uses no ${variables}."),
       h(
         "div",
         { class: "sn-buttons" },
-        h("button", { type: "button", class: "secondary", onclick: () => D.download("sample-data.json", JSON.stringify(S.sample, null, 2) + "\n", "application/json") }, "Export sample data JSON"),
+        h("button", { type: "button", class: "secondary", onclick: () => D.download("sample-data.json", JSON.stringify({ values: S.sample, meanings: S.meanings }, null, 2) + "\n", "application/json") }, "Export sample data JSON"),
         h("button", { type: "button", class: "secondary", onclick: () => importInput.click() }, "Import sample data JSON"),
         h(
           "button",
@@ -708,41 +731,14 @@
     return parts.join("\n");
   }
 
-  // Removes the sizing that bends a Google Doc out of shape: fixed heights
-  // anywhere, pixel widths / max-widths on tables and cells, auto margins.
-  // Percentage widths (e.g. a 40% label column) are kept.
-  function flattenSizing(html) {
-    const doc = new DOMParser().parseFromString(`<div id="__root">${html}</div>`, "text/html");
-    const root = doc.getElementById("__root");
-    root.querySelectorAll("*").forEach((el) => {
-      el.removeAttribute("height");
-      const isTableish = /^(TABLE|TD|TH|TR|TBODY)$/.test(el.tagName);
-      if (isTableish && /px$|^\d+$/.test(el.getAttribute("width") || "")) el.removeAttribute("width");
-      const style = el.getAttribute("style");
-      if (!style) return;
-      const kept = style
-        .split(";")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .filter((s) => {
-          if (/^(height|min-height|max-height)\s*:/i.test(s)) return false;
-          if (isTableish && /^(width|max-width|min-width)\s*:\s*[\d.]+px/i.test(s)) return false;
-          if (/^margin\s*:.*auto/i.test(s)) return false;
-          return true;
-        });
-      if (kept.length) el.setAttribute("style", kept.join("; "));
-      else el.removeAttribute("style");
-    });
-    return root.innerHTML;
-  }
-
   // mode: "full" (whole layout, used by the preview), "simple" (simplified
   // layout for Docs) or "body" (just the notification/template body).
-  function renderedEmail(n, mode) {
+  function renderedEmail(n, mode, fillOpts) {
     const e = effective(n);
-    if (!e.layoutHtml || mode === "body") return C.fillHtml(e.body, S.sample);
-    if (mode === "simple") return flattenSizing(C.fillHtml(C.wrapInLayout(simplifyLayout(e.layoutHtml), e.body), S.sample));
-    return C.fillHtml(C.wrapInLayout(e.layoutHtml, e.body), S.sample);
+    if (!e.layoutHtml || mode === "body") return C.fillHtml(e.body, S.sample, fillOpts);
+    // Sizing/spacer cleanup for Docs happens in DocsExport.prepareForDocs.
+    if (mode === "simple") return C.fillHtml(C.wrapInLayout(simplifyLayout(e.layoutHtml), e.body), S.sample, fillOpts);
+    return C.fillHtml(C.wrapInLayout(e.layoutHtml, e.body), S.sample, fillOpts);
   }
 
   function renderPreview() {
@@ -802,20 +798,36 @@
     const n = S.selected ? S.notifications.get(S.selected) : null;
     if (!n) return;
     const e = effective(n);
-    const subject = C.fillText(e.subject, S.sample);
+    const showNames = els.docsShowNames.checked;
+    const subject = showNames ? C.fillText(e.subject, null) : C.fillText(e.subject, S.sample);
     // Kept short on purpose - the full config is in the inventory sheet.
     const rows = [
       ["Notification", n.f.name || ""],
-      ["Subject", subject],
       ["When it sends", C.triggerSummary(n.f, n.conditionDisplay)],
-      ["Who receives it", recipientsForDocs(n)],
       ["Last updated", n.f.sys_updated_on || ""],
     ];
     if (isEdited(n) || isEdited(e.template)) rows.push(["Note", "Contains proposed edits that are not yet in ServiceNow."]);
+    // The email's own header, right above it - like the inbox preview.
+    const emailHead = [
+      ["From", n.f.from || DEFAULT_FROM],
+      ["To", recipientsForDocs(n)],
+      ["Subject", subject],
+    ];
     // Review Docs get no images at all - each one becomes a [Logo] label.
-    const email = await D.prepareForDocs(C.imagesToPlaceholder(renderedEmail(n, els.docsContent.value)));
-    const html = D.headerTable(rows) + email;
-    const text = rows.map(([k, v]) => `${k}: ${v}`).join("\n") + "\n\n" + D.htmlToText(email);
+    const email = await D.prepareForDocs(C.imagesToPlaceholder(renderedEmail(n, els.docsContent.value, { showNames })));
+    // Every ${variable} the email uses, with its meaning and example value.
+    const { variables } = C.findVariables(e.subject + "\n" + e.body + "\n" + e.layoutHtml);
+    const varRows = variables.map((v) => ["${" + v + "}", S.meanings[v] || "", S.sample[v] != null ? S.sample[v] : C.defaultSampleValue(v)]);
+    const varTable = varRows.length ? D.gridTable(["Variable", "Meaning", "Example"], varRows) : "";
+    const html = D.headerTable(rows) + varTable + D.headerTable(emailHead) + email;
+    const kvText = (list) => list.map(([k, v]) => `${k}: ${v}`).join("\n");
+    const text =
+      kvText(rows) +
+      (varRows.length ? "\n\nVariables:\n" + varRows.map(([v, m, x]) => `${v}${m ? " - " + m : ""} (e.g. ${x})`).join("\n") : "") +
+      "\n\n" +
+      kvText(emailHead) +
+      "\n\n" +
+      D.htmlToText(email);
     flash(els.copyDocs, (await D.copyRich(html, text)) ? "Copied! Paste into Google Docs" : "Copy failed");
   });
 

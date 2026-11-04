@@ -682,7 +682,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sn-script { margin-bottom: 6px; }
 
 .sn-sample { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.sn-sample-row { display: grid; grid-template-columns: minmax(0, 45%) minmax(0, 1fr); gap: 8px; align-items: center; font-size: 12px; }
+.sn-sample-row,
+.sn-sample-head { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.3fr); gap: 6px; align-items: center; font-size: 12px; }
+.sn-sample-head { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.sn-preview-actions { flex-wrap: wrap; }
 .sn-sample-row code { overflow: hidden; text-overflow: ellipsis; }
 
 .sn-buttons { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
