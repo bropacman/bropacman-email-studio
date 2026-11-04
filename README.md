@@ -52,16 +52,22 @@ notification into something a process owner can read and comment on:
   exported), event parm 1/2 and "send to event creator"
 - a **preview** with editable fake sample data (`${number}` → `HRC0001234`,
   `${opened_for.name}` → `Jane Sample`, …). `${mail_script:name}` shows up as a
-  **[Dynamic content: name]** box; the script's source appears in a
-  collapsible panel for developers and is never executed.
-- **Copy for Google Docs**: for pasting into that notification's tab in
-  the program's Doc. In order:
+  **[Dynamic content: name]** box. Mail scripts are never executed. In the
+  **Mail scripts** section you can type what each script does and an
+  **example of its output**. With "Use mail script examples" on (the
+  default), the example replaces the box in the preview and the Docs copy,
+  in a dashed outline so readers can tell it's generated. The script's
+  source is in a collapsible panel for developers.
+- **Copy for Google Docs**: one notification, under its name as a
+  heading. In order:
   1. a small table (notification name, when it sends, last updated)
   2. a **Variables** table: each `${variable}` the email uses, the meaning
      you typed for it in the Sample data panel, and an example value
-  3. the email's From / To / Subject (users and groups are counted, not
+  3. a **Mail scripts** table: each mail script the email uses, what it
+     does, and its example output
+  4. the email's From / To / Subject (users and groups are counted, not
      listed by sys_id)
-  4. the email itself
+  5. the email itself
 
   Variables show by name (as `${opened_for.first_name}` chips), so readers
   learn what each one is. Untick "Show ${variable} names" to get sample
@@ -105,8 +111,9 @@ notification into something a process owner can read and comment on:
   type them per category. Only http(s) links are used; anything else is
   shown as text.
 - **Settings JSON**: **Export / Import settings JSON** saves everything
-  you've typed (sample values, variable meanings and every program's cover
-  fields) to one file you keep, so the next session starts where you left
+  you've typed (sample values, variable meanings, mail script descriptions
+  and examples, and every program's cover fields) to one file you keep, so
+  the next session starts where you left
   off. Nothing is saved automatically. The older sample-data-only JSON
   still imports.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row

@@ -440,6 +440,17 @@
     "padding:2px 6px;border-radius:4px;font-family:Arial,sans-serif;font-size:12px;font-style:normal;font-weight:normal;";
   const UNKNOWN_VAR_STYLE = "background:#fff3b0;padding:0 2px;border-radius:3px;";
 
+  // A typed-in example of a mail script's output, shown in place of the
+  // [Dynamic content] box. Plain text (escaped, newlines kept), still in a
+  // dashed outline so readers can tell it's generated, not fixed wording.
+  function mailScriptExample(name, example) {
+    const text = escapeHtml(example).replace(/\r?\n/g, "<br>");
+    return (
+      `<span style="display:inline-block;border:1px dashed #b26a00;padding:1px 5px;border-radius:4px;" ` +
+      `title="Example output of mail script ${escapeHtml(name)} (typed in, not executed)">${text}</span>`
+    );
+  }
+
   function mailScriptPlaceholder(name) {
     return `<span style="${MAIL_SCRIPT_STYLE}" title="Mail script: ${escapeHtml(name)} (not executed)">[Dynamic content: ${escapeHtml(name)}]</span>`;
   }
@@ -469,15 +480,21 @@
     return `<span style="${VAR_CHIP_STYLE}">${escapeHtml("${" + token + "}")}</span>`;
   }
 
-  // Fills an HTML string: mail scripts -> placeholder boxes, known variables
-  // -> escaped sample values (or, with opts.showNames, a ${name} chip so
-  // readers learn what each variable is), anything else left visible and
-  // highlighted.
+  // Fills an HTML string: mail scripts -> placeholder boxes (or, with
+  // opts.scriptExamples { name: text }, that script's typed-in example
+  // output), known variables -> escaped sample values (or, with
+  // opts.showNames, a ${name} chip so readers learn what each variable is),
+  // anything else left visible and highlighted.
   function fillHtml(html, values, opts) {
     const showNames = !!(opts && opts.showNames);
+    const examples = (opts && opts.scriptExamples) || null;
     return (html || "").replace(VAR_RE, (match, token) => {
       const t = token.trim();
-      if (/^mail_script:/i.test(t)) return mailScriptPlaceholder(t.slice(12).trim());
+      if (/^mail_script:/i.test(t)) {
+        const name = t.slice(12).trim();
+        const ex = examples && Object.prototype.hasOwnProperty.call(examples, name) ? String(examples[name] || "") : "";
+        return ex.trim() ? mailScriptExample(name, ex) : mailScriptPlaceholder(name);
+      }
       if (showNames) return variableChip(t);
       if (values && Object.prototype.hasOwnProperty.call(values, t)) return escapeHtml(values[t]);
       return `<span style="${UNKNOWN_VAR_STYLE}" title="Dynamic ServiceNow value">${escapeHtml(match)}</span>`;
