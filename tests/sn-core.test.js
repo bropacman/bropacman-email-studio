@@ -251,7 +251,13 @@ test("fillHtml can show ${variable} names instead of sample values", () => {
   assert.match(out, />\$\{number\}<\/span>/);
   assert.match(out, />\$\{opened_for\.name\}<\/span>/);
   assert.doesNotMatch(out, /HRC1/);
-  assert.match(out, /\[Dynamic content: x\]/);
+  // Mail scripts show their ${mail_script:name}, not the box or an example.
+  assert.match(out, />\$\{mail_script:x\}<\/span>/);
+  assert.doesNotMatch(out, /Dynamic content/);
+  const withExample = C.fillHtml("${mail_script:sig}", {}, { showNames: true, scriptExamples: { sig: "Thanks, HR" } });
+  assert.match(withExample, /\$\{mail_script:sig\}/);
+  assert.doesNotMatch(withExample, /Thanks, HR/);
+  assert.equal(C.fillText("Re: ${number} ${mail_script:x}", { number: "HRC1" }, { showNames: true }), "Re: ${number} ${mail_script:x}");
 });
 
 test("index.html is stamped with the current build version", () => {

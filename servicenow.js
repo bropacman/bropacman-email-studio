@@ -1299,7 +1299,7 @@
   async function notificationDocs(n, title) {
     const e = effective(n);
     const showNames = els.docsShowNames.checked;
-    const subject = showNames ? C.fillText(e.subject, null) : C.fillText(e.subject, S.sample);
+    const subject = showNames ? C.fillText(e.subject, null, { showNames }) : C.fillText(e.subject, S.sample);
     // Kept short on purpose - the full config is in the inventory sheet.
     const rows = [
       ["Notification", n.f.name || ""],

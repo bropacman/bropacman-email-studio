@@ -96,7 +96,8 @@ For each record:
   **[Dynamic content: name]** box. Mail scripts are never executed. In the
   **Mail scripts** section you can type what each script does and an
   **example of its output**. With "Use mail script examples" on (the
-  default), the example replaces the box in the preview and the Docs copy,
+  default), the example replaces the box in the preview (and in the Docs
+  copy when "Show ${variable} names" is off),
   in a dashed outline so readers can tell it's generated. The script's
   source is in a collapsible panel for developers.
 - **Copy for Google Docs**: one notification, under its name as a
@@ -110,8 +111,9 @@ For each record:
      listed by sys_id)
   5. the email itself
 
-  Variables show by name (as `${opened_for.first_name}` chips), so readers
-  learn what each one is. Untick "Show ${variable} names" to get sample
+  Variables and mail scripts show by name (as `${opened_for.first_name}` and
+  `${mail_script:name}` chips), so readers learn what each one is; their
+  examples are in the Variables and Mail scripts tables. Untick "Show ${variable} names" to get sample
   values instead. Meanings are kept in memory and saved with the settings
   JSON (see below), so you can write them once and reload them. By
   default the email uses a **simplified layout**: all of the layout's text is

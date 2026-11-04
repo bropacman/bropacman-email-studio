@@ -620,28 +620,32 @@
 
   // Fills an HTML string: mail scripts -> placeholder boxes (or, with
   // opts.scriptExamples { name: text }, that script's typed-in example
-  // output), known variables -> escaped sample values (or, with
-  // opts.showNames, a ${name} chip so readers learn what each variable is),
-  // anything else left visible and highlighted.
+  // output), known variables -> escaped sample values, anything else left
+  // visible and highlighted. With opts.showNames, every variable and mail
+  // script becomes a ${name} / ${mail_script:name} chip instead, so readers
+  // learn what each one is (examples live in the Doc's tables).
   function fillHtml(html, values, opts) {
     const showNames = !!(opts && opts.showNames);
     const examples = (opts && opts.scriptExamples) || null;
     return (html || "").replace(VAR_RE, (match, token) => {
       const t = token.trim();
+      if (showNames) return variableChip(/^mail_script:/i.test(t) ? "mail_script:" + t.slice(12).trim() : t);
       if (/^mail_script:/i.test(t)) {
         const name = t.slice(12).trim();
         const ex = examples && Object.prototype.hasOwnProperty.call(examples, name) ? String(examples[name] || "") : "";
         return ex.trim() ? mailScriptExample(name, ex) : mailScriptPlaceholder(name);
       }
-      if (showNames) return variableChip(t);
       if (values && Object.prototype.hasOwnProperty.call(values, t)) return escapeHtml(values[t]);
       return `<span style="${UNKNOWN_VAR_STYLE}" title="Dynamic ServiceNow value">${escapeHtml(match)}</span>`;
     });
   }
 
-  function fillText(text, values) {
+  // opts.showNames keeps every ${variable} and ${mail_script:name} as is.
+  function fillText(text, values, opts) {
+    const showNames = !!(opts && opts.showNames);
     return (text || "").replace(VAR_RE, (match, token) => {
       const t = token.trim();
+      if (showNames) return match;
       if (/^mail_script:/i.test(t)) return `[Dynamic content: ${t.slice(12).trim()}]`;
       if (values && Object.prototype.hasOwnProperty.call(values, t)) return values[t];
       return match;
