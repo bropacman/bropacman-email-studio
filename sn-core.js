@@ -483,6 +483,35 @@
   }
 
   // ---------------------------------------------------------------------
+  // Images -> "[Logo]" placeholder
+  //
+  // ServiceNow layouts reference images relative to the instance
+  // (/sys_attachment.do?sys_id=..., logo.pngx), which can't load here and
+  // would show a broken-image icon. Images also aren't wanted in the review
+  // Docs. Swapping each <img> for a short text label keeps the layout
+  // readable without the picture.
+  // ---------------------------------------------------------------------
+
+  const IMAGE_PLACEHOLDER = "[Logo]";
+
+  function imgSrc(tag) {
+    const m = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+    return m ? (m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3]) : "";
+  }
+
+  // Relative URLs resolve against this tool, not the instance.
+  function isRelativeUrl(src) {
+    return !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test((src || "").trim());
+  }
+
+  // shouldReplace(src) decides per image; omit it to replace every image.
+  function imagesToPlaceholder(html, shouldReplace) {
+    return (html || "").replace(/<img\b[^>]*>/gi, (tag) =>
+      shouldReplace && !shouldReplace(imgSrc(tag)) ? tag : `<span>${IMAGE_PLACEHOLDER}</span>`
+    );
+  }
+
+  // ---------------------------------------------------------------------
   // CSV / TSV
   // ---------------------------------------------------------------------
 
@@ -528,6 +557,9 @@
     wrapInLayout,
     fillHtml,
     fillText,
+    isRelativeUrl,
+    imagesToPlaceholder,
+    IMAGE_PLACEHOLDER,
     toCsv,
     toTsv,
   };
