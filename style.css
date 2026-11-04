@@ -392,6 +392,18 @@ body {
   border-top: 1px solid var(--border);
 }
 
+/* Body editor full-screen mode (see toggleEditorFullscreen in app.js). */
+.tox.tox-tinymce.editor-fullscreen {
+  position: fixed !important;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0;
+}
+
+body.editor-fullscreen-active { overflow: hidden; }
+
 /* ------------------------------------------------------------------
    View tabs (Composer / ServiceNow import)
    ------------------------------------------------------------------ */
