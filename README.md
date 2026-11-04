@@ -43,7 +43,7 @@ notification into something a process owner can read and comment on:
   category, table and active
 - **When it sends**: table, insert/update/event, and the `condition` encoded
   query in plain English (`^` = AND, `^OR` = OR, `^NQ` = a new OR'd query).
-  Field names are shown as-is. Where the export itself includes a label for
+  Tables and fields are shown by **friendly label** (see below). Where the export itself includes a label for
   a reference value (the `<item display_value=...>` rows ServiceNow adds
   inside `<condition>`), it's shown next to the raw sys_id. Advanced
   (scripted) conditions show **"Custom script logic — ask HRIT"** instead of
@@ -117,9 +117,32 @@ notification into something a process owner can read and comment on:
   off. Nothing is saved automatically. The older sample-data-only JSON
   still imports.
 - **Export inventory CSV** / **Copy inventory for Google Sheets**: one row
-  per notification in the current filter (name, category, table, trigger
-  summary, recipients summary, active, has advanced condition, uses mail
-  scripts, template name, sys_id, sys_updated_on)
+  per notification in the current filter (name, category, table label,
+  table name, trigger summary, recipients summary, active, has advanced
+  condition, uses mail scripts, template name, sys_id, sys_updated_on)
+
+**Friendly labels.** Business readers see labels instead of technical
+names. They're worked out from the name itself, with no dictionary export
+needed:
+
+- **fields**: drop a leading `u_`, underscores become spaces, sentence
+  case, common acronyms upper-cased, and dot-walks joined with "›".
+  `opened_for` → "Opened for", `u_start_date` → "Start date",
+  `opened_for.first_name` → "Opened for › First name", `hr_service` →
+  "HR service". `sys_` fields use their standard labels (`sys_updated_on`
+  → "Updated").
+- **tables**: the same, in Title Case, with the scope prefix dropped
+  (`sn_hr_core_case` → "HR Case"). A few standard tables whose label
+  doesn't follow the name are built in (`sn_hr_le_case` → "Lifecycle Event
+  Case").
+
+Labels are used in the Google Docs copies, the program cover, the
+inventory summaries, the preview's "To" line, the table filter and the list.
+The app's detail panel shows the label with the technical name beside it
+in grey, for admins. `${variables}` and mail script names keep their names
+everywhere (in the email, the Variables table and the Mail scripts table).
+Choice values (e.g. `State is one of "10", "18"`) stay as their stored
+values, since those labels are instance-specific.
 - **Advanced: edit & download XML** (off by default): edit `subject` and
   `message_html` of the notification or its template and download a
   single-record XML **for import into a DEV instance only**
