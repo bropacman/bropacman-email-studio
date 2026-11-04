@@ -179,6 +179,23 @@ byte-identical under exactly that normalization, including CRLF files.
 node --test tests/*.test.js
 ```
 
+### Releasing (version stamp)
+
+GitHub Pages lets browsers keep files for 10 minutes, so after a release
+people could keep running old scripts. `index.html` therefore loads each
+app file with a `?v=<build>` query, and the header shows the same
+**build** label. The build is a hash of the app's files. After changing any
+of `style.css`, `app.js`, `docs-export.js`, `sn-core.js`, `servicenow.js` or
+`fixtures/demo-data.js`, run:
+
+```bash
+node scripts/stamp-version.js
+```
+
+A test fails if you forget. After a release, a normal refresh loads the
+new build. A tab opened within about 10 minutes of the release can still show
+the previous build, so check the label and refresh if it hasn't changed.
+
 The tests use Node's built-in runner only, with no packages to install. If you edit
 the fixture XML, regenerate the demo copy with
 `node scripts/build-demo-data.js`. A test fails if the two drift apart.
