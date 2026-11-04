@@ -35,6 +35,8 @@ test("splits the combined fixture into every record", () => {
     sysevent_email_template: 1,
     sys_script_email: 2,
     sysevent_email_action: 5,
+    sn_hr_core_email_content: 1,
+    sn_cd_content_notification: 1,
   });
 });
 
@@ -346,4 +348,45 @@ test("glossary round-trips through CSV and reads back what was typed", () => {
   assert.deepEqual(loose.variables, { x: { meaning: "An x", example: "1" } });
   assert.deepEqual(loose.mailScripts, { my_script: { description: "Does y" } });
   assert.throws(() => C.readGlossary([["Foo"], ["bar"]]), /No "Name" column/);
+});
+
+test("HR email content and content delivery: summaries say where it's configured", () => {
+  const content = { __source: "sn_hr_core_email_content", collection: "sn_hr_le_case", type: "activity_notification" };
+  assert.equal(
+    C.triggerSummary(content, null, { friendly: true }),
+    "Lifecycle Event Case: sent by an HR Lifecycle Event activity (Activity notification); when it sends is set on that activity"
+  );
+  assert.equal(C.recipientsSummary(content), "Set on the Lifecycle Event activity that sends it");
+  const cd = { sys_class_name: "sn_cd_content_notification", state: "draft", user_reference_table: "sys_user" };
+  assert.equal(
+    C.triggerSummary(cd, null, { friendly: true }),
+    "Content delivery: sent by Content Delivery on the schedule set in Content Publishing (state: Draft)"
+  );
+  assert.equal(C.recipientsSummary(cd, { friendly: true }), "The audience chosen in Content Publishing (User records)");
+  assert.equal(C.SOURCES.sn_cd_content_notification.body, "rich_text_plain_html");
+});
+
+test("content delivery body edits keep CDATA and change only that field", () => {
+  const u = C.splitUnload(combined);
+  const raw = u.records.find((r) => r.table === "sn_cd_content_notification").raw;
+  const edited = C.replaceField(raw, "rich_text_plain_html", "<p>New wording</p>");
+  assert.ok(edited.includes("<rich_text_plain_html><![CDATA[<p>New wording</p>]]></rich_text_plain_html>"));
+  for (const f of ["sys_id", "sys_updated_on", "sys_mod_count", "subject", "title", "state"]) {
+    assert.equal(C.readField(edited, f), C.readField(raw, f), f);
+  }
+  const back = C.splitUnload(C.buildUnloadXml(u.decl, u.unloadOpenTag, [raw]));
+  assert.equal(back.records[0].raw, raw);
+});
+
+test("inventory CSV: categories are read by sys_id; glossary CSVs aren't mistaken for it", () => {
+  const rows = C.parseCsv(
+    C.toCsv([
+      ["Name", "Source", "Category", "Category source", "sys_id"],
+      ["Welcome content", "HR email content", "Onboarding", "Not assigned", "9A0B1C2D3E4F5A6B7C8D9E0F1A2B3C4D"],
+      ["Reminder", "Content delivery", "", "Not assigned", "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5"],
+      ["Bad id", "Content delivery", "X", "", "not-a-sys-id"],
+    ])
+  );
+  assert.deepEqual(C.readInventoryCategories(rows), { "9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d": "Onboarding" });
+  assert.equal(C.readInventoryCategories([C.GLOSSARY_HEADER, ["Variable", "${x}", "", "", ""]]), null);
 });

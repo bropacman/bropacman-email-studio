@@ -21,6 +21,9 @@
     sysevent_email_template: "templates",
     sys_script_email: "scripts",
     sys_email_layout: "layouts",
+    // Other places HR emails come from - listed alongside notifications.
+    sn_hr_core_email_content: "notifications",
+    sn_cd_content_notification: "notifications",
   };
   const DEFAULT_FROM = "ServiceNow <noreply@yourinstance.service-now.com>";
 
@@ -36,6 +39,7 @@
     meanings: {}, // variable -> plain-English meaning the user typed in
     programs: {}, // category -> { description, ownerGroup, strategyUrl, inventoryUrl, reviewText } for cover pages
     scriptInfo: {}, // mail script name -> { description, example } typed in by the user
+    assignedCategories: {}, // sys_id -> category, for HR email content / content delivery (no category in ServiceNow)
     edits: {}, // sys_id -> { subject?, message_html? }
     selected: null,
     advanced: false,
@@ -153,6 +157,13 @@
         continue;
       }
       const { f, dv, conditionDisplay } = parseRecord(r.raw);
+      if (kind === "notifications") {
+        // In-memory conveniences only (rec.raw, used for XML downloads, is
+        // untouched): which source this is, plus the common name/table fields.
+        f.__source = r.table;
+        if (!f.name && f.title) f.name = f.title;
+        if (!f.collection && r.table === "sn_hr_core_email_content" && f.table) f.collection = f.table;
+      }
       const rec = { table: r.table, sysId: f.sys_id, f, dv, conditionDisplay, raw: r.raw, fileIdx };
       if (!rec.sysId) {
         counts.skipped++;
@@ -172,7 +183,7 @@
     for (const file of files) {
       // Glossary CSVs and settings JSON can be dropped in the same place.
       if (/\.(csv|tsv|txt)$/i.test(file.name)) {
-        lines.push(await importGlossaryFile(file));
+        lines.push(await importCsvFile(file));
         continue;
       }
       if (/\.json$/i.test(file.name)) {
@@ -268,7 +279,37 @@
     return id ? S.layouts.get(id) || null : null;
   }
 
+  function isNotification(rec) {
+    return rec.table === "sysevent_email_action";
+  }
+
+  function sourceLabel(rec) {
+    return (C.SOURCES[rec.table] || {}).label || "Notification";
+  }
+
+  // The field holding a record's HTML body.
+  function bodyField(rec) {
+    return (C.SOURCES[rec.table] || {}).body || "message_html";
+  }
+
+  // HR email content has no active flag (the activity decides); everything
+  // else uses its own active field.
+  function isActive(n) {
+    return n.table === "sn_hr_core_email_content" ? true : C.isTrue(n.f.active);
+  }
+
   function effective(n) {
+    if (!isNotification(n)) {
+      return {
+        template: null,
+        layout: null,
+        subject: val(n, "subject"),
+        subjectSource: "this record",
+        body: val(n, bodyField(n)),
+        bodySource: `this record (${bodyField(n)})`,
+        layoutHtml: "",
+      };
+    }
     const t = templateOf(n);
     const layout = layoutOf(n);
     // Like ServiceNow itself: a notification's own subject / message_html
@@ -296,13 +337,23 @@
     return (rec.dv[field] || id) + " (not in imported files)";
   }
 
+  // HR email content and content delivery records have no category; they
+  // group under their source instead.
+  // A category assigned in this tool to an HR email content or content
+  // delivery record (notifications always use ServiceNow's category).
+  function assignedCategory(n) {
+    return isNotification(n) ? "" : S.assignedCategories[n.sysId] || "";
+  }
+
   function categoryLabel(n) {
+    if (!isNotification(n)) return assignedCategory(n) || sourceLabel(n);
     return n.dv.category || n.f.category || "(No category)";
   }
 
   // Uncategorized notifications sort to the bottom of the list.
   function categorySortKey(n) {
-    return (n.dv.category || n.f.category ? "0" : "1") + categoryLabel(n).toLowerCase();
+    const categorized = !isNotification(n) || n.dv.category || n.f.category;
+    return (categorized ? "0" : "1") + categoryLabel(n).toLowerCase();
   }
 
   function usesMailScripts(n) {
@@ -341,7 +392,7 @@
       .filter((n) => {
         if (cat && categoryLabel(n) !== cat) return false;
         if (table && (n.f.collection || "(no table)") !== table) return false;
-        if (active && String(C.isTrue(n.f.active)) !== active) return false;
+        if (active && String(isActive(n)) !== active) return false;
         if (q) {
           const e = effective(n);
           const hay = [n.f.name, e.subject, n.f.collection, n.f.event_name, n.f.description, categoryLabel(n)]
@@ -387,8 +438,9 @@
       name.textContent = n.f.name || n.sysId;
       const meta = document.createElement("span");
       meta.className = "sn-item-meta";
-      meta.append(n.f.collection ? C.friendlyTable(n.f.collection) : "(no table)");
-      if (!C.isTrue(n.f.active)) meta.append(badge("Inactive", "muted"));
+      meta.append(n.f.collection ? C.friendlyTable(n.f.collection) : isNotification(n) ? "(no table)" : sourceLabel(n));
+      if (!isActive(n)) meta.append(badge("Inactive", "muted"));
+      if (n.table === "sn_cd_content_notification" && n.f.state && n.f.state !== "published") meta.append(badge(cap(n.f.state), "warn"));
       if (C.hasAdvancedCondition(n.f)) meta.append(badge("Script logic", "warn"));
       const t = templateOf(n);
       if (isEdited(n) || isEdited(t)) meta.append(badge("Edited", "edit"));
@@ -593,7 +645,7 @@
     Object.entries(S.scriptInfo).forEach(([name, info]) => {
       if (info && (info.description || info.example)) mailScripts[name] = { description: info.description || "", example: info.example || "" };
     });
-    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts };
+    const data = { values: S.sample, meanings: S.meanings, programs: S.programs, mailScripts, categories: S.assignedCategories };
     D.download("email-studio-settings.json", JSON.stringify(data, null, 2) + "\n", "application/json");
   }
 
@@ -601,7 +653,7 @@
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("expected a JSON object");
-      const isNew = data.values || data.meanings || data.programs || data.mailScripts;
+      const isNew = data.values || data.meanings || data.programs || data.mailScripts || data.categories;
       Object.entries(isNew ? data.values || {} : data).forEach(([k, v]) => (S.sample[k] = String(v)));
       Object.entries(isNew ? data.meanings || {} : {}).forEach(([k, v]) => (S.meanings[k] = String(v)));
       Object.entries(isNew ? data.programs || {} : {}).forEach(([cat, p]) => {
@@ -617,6 +669,11 @@
         if (info.description != null) target.description = String(info.description);
         if (info.example != null) target.example = String(info.example);
       });
+      Object.entries(isNew ? data.categories || {} : {}).forEach(([id, cat]) => {
+        if (cat != null && String(cat).trim()) S.assignedCategories[id] = String(cat).trim();
+      });
+      refreshFilterOptions();
+      renderList();
       renderSelected();
       updateCoverPanel(true);
       return true;
@@ -699,7 +756,8 @@
     }
     const e = effective(n);
     const advancedScript = C.hasAdvancedCondition(n.f);
-    els.detail.replaceChildren(
+    // Sections that don't apply are null; replaceChildren would print those as "null".
+    els.detail.replaceChildren(...[
       h(
         "header",
         { class: "sn-detail-head" },
@@ -707,13 +765,23 @@
         h(
           "div",
           { class: "sn-item-meta" },
-          C.isTrue(n.f.active) ? badge("Active", "ok") : badge("Inactive", "muted"),
-          badge(categoryLabel(n)),
+          n.table === "sn_hr_core_email_content"
+            ? badge("Activity-driven", "muted")
+            : isActive(n)
+            ? badge("Active", "ok")
+            : badge("Inactive", "muted"),
+          n.table === "sn_cd_content_notification" && n.f.state ? badge(cap(n.f.state), n.f.state === "published" ? "ok" : "warn") : null,
+          badge(assignedCategory(n) ? `${categoryLabel(n)} (assigned here)` : categoryLabel(n), assignedCategory(n) ? "edit" : ""),
           isEdited(n) || isEdited(e.template) ? badge("Edited locally", "edit") : null
         ),
         n.f.description ? h("p", { class: "muted" }, n.f.description) : null
       ),
-      section(
+      isNotification(n) ? null : categoryField(n),
+      isNotification(n) ? null : otherSourceWhen(n),
+      isNotification(n) ? null : otherSourceWho(n),
+      !isNotification(n)
+        ? null
+        : section(
         "When it sends",
         kv([
           ["Table", n.f.collection ? labelWithName(C.friendlyTable(n.f.collection), n.f.collection) : "(none)"],
@@ -734,7 +802,9 @@
             : null,
         ])
       ),
-      section(
+      !isNotification(n)
+        ? null
+        : section(
         "Who receives it",
         kv([
           ["Recipient fields", fieldListOrNone(n.f.recipient_fields)],
@@ -748,8 +818,8 @@
       section(
         "Content",
         kv([
-          ["Template", n.f.template ? refLabel(n, "template", S.templates) : ""],
-          ["Layout", layoutIdOf(n) ? (e.layout ? e.layout.f.name : (e.template && e.template.dv.email_layout) || n.dv.email_layout || layoutIdOf(n)) + (e.layout ? "" : " (not in imported files)") : ""],
+          isNotification(n) ? ["Template", n.f.template ? refLabel(n, "template", S.templates) : ""] : null,
+          !isNotification(n) ? null : ["Layout", layoutIdOf(n) ? (e.layout ? e.layout.f.name : (e.template && e.template.dv.email_layout) || n.dv.email_layout || layoutIdOf(n)) + (e.layout ? "" : " (not in imported files)") : ""],
           ["Subject from", e.subjectSource],
           ["Body from", e.bodySource],
           ["Scope", n.dv.sys_scope || n.f.sys_scope],
@@ -760,9 +830,94 @@
       sampleDataSection(n),
       mailScriptSection(n),
       S.advanced ? advancedSection(n) : null
-    );
+    ].filter(Boolean));
     els.copyDocs.disabled = false;
     renderPreview();
+  }
+
+  function cap(s) {
+    const t = String(s || "");
+    return t ? t[0].toUpperCase() + t.slice(1) : t;
+  }
+
+  // "When it sends" / "Who receives it" for HR email content and content
+  // delivery records: these say where that's configured instead of guessing.
+  // Category for records ServiceNow doesn't categorize. Suggests the
+  // existing notification categories so a record can join that program.
+  function categoryField(n) {
+    const known = new Set();
+    S.notifications.forEach((x) => {
+      if (isNotification(x) && (x.dv.category || x.f.category)) known.add(x.dv.category || x.f.category);
+      if (assignedCategory(x)) known.add(assignedCategory(x));
+    });
+    const listId = "snCategoryOptions";
+    const apply = (value) => {
+      const v = value.trim();
+      if (v && v !== sourceLabel(n)) S.assignedCategories[n.sysId] = v;
+      else delete S.assignedCategories[n.sysId];
+      refreshFilterOptions();
+      renderList();
+      renderSelected();
+      updateCoverPanel(true);
+    };
+    return section(
+      "Category",
+      h(
+        "p",
+        { class: "muted" },
+        `ServiceNow has no category for ${sourceLabel(n)}. Assign one here so it joins that program's list, Doc and cover - ` +
+          "or fill the Category column in the inventory sheet and import that CSV. Kept in memory and saved with the settings JSON."
+      ),
+      h(
+        "div",
+        { class: "sn-buttons" },
+        h("input", {
+          type: "text",
+          class: "sn-category-input",
+          list: listId,
+          value: assignedCategory(n),
+          placeholder: `e.g. ${[...known][0] || "Human Resources"}`,
+          "aria-label": "Assigned category",
+          onchange: (ev) => apply(ev.target.value),
+        }),
+        h("datalist", { id: listId }, [...known].sort().map((c) => h("option", { value: c }))),
+        assignedCategory(n) ? h("button", { type: "button", class: "secondary", onclick: () => apply("") }, "Clear") : null
+      )
+    );
+  }
+
+  function otherSourceWhen(n) {
+    const isContent = n.table === "sn_hr_core_email_content";
+    return section(
+      "When it sends",
+      h(
+        "div",
+        { class: "callout" },
+        isContent
+          ? "This is HR email content. It's sent by a Lifecycle Event activity, and when it sends is configured on that activity, not here."
+          : "This is a Content Delivery email. It's sent on the schedule set in Content Publishing, not configured here."
+      ),
+      kv([
+        ["Source", labelWithName(sourceLabel(n), n.table)],
+        isContent && n.f.collection ? ["Table", labelWithName(C.friendlyTable(n.f.collection), n.f.collection)] : null,
+        isContent && n.f.type ? ["Type", labelWithName(C.friendlyField(n.f.type), n.f.type)] : null,
+        !isContent ? ["State", cap(n.f.state) || "(none)"] : null,
+        !isContent ? ["Active", yesNo(n.f.active)] : null,
+        !isContent && n.dv.content_type ? ["Content type", n.dv.content_type] : null,
+      ])
+    );
+  }
+
+  function otherSourceWho(n) {
+    const isContent = n.table === "sn_hr_core_email_content";
+    return section(
+      "Who receives it",
+      kv([
+        ["Recipients", C.recipientsSummary(n.f, { friendly: true })],
+        !isContent ? ["From", n.f.from || "(default)"] : null,
+        !isContent ? ["Reply-to", n.f.reply_to || "(default)"] : null,
+      ])
+    );
   }
 
   // ------------------------------------------------------------------
@@ -995,7 +1150,9 @@
 
   const INVENTORY_HEADER = [
     "Name",
+    "Source",
     "Category",
+    "Category source",
     "Table",
     "Table name",
     "Trigger summary",
@@ -1013,12 +1170,16 @@
       INVENTORY_HEADER,
       ...filteredNotifications().map((n) => [
         n.f.name || "",
-        categoryLabel(n),
+        sourceLabel(n),
+        // Unassigned HR email content / content delivery rows get an empty
+        // Category cell, ready to be filled in the sheet and imported back.
+        isNotification(n) ? categoryLabel(n) : assignedCategory(n),
+        isNotification(n) ? (n.dv.category || n.f.category ? "ServiceNow" : "None") : assignedCategory(n) ? "Assigned in tool" : "Not assigned",
         n.f.collection ? C.friendlyTable(n.f.collection) : "",
         n.f.collection || "",
         C.triggerSummary(n.f, n.conditionDisplay, { friendly: true }),
         C.recipientsSummary(n.f, { friendly: true }),
-        C.isTrue(n.f.active) ? "true" : "false",
+        isActive(n) ? "true" : "false",
         C.hasAdvancedCondition(n.f) ? "Y" : "N",
         usesMailScripts(n) ? "Y" : "N",
         n.f.template ? refLabel(n, "template", S.templates) : "",
@@ -1099,13 +1260,18 @@
               renderSelected();
             },
           },
-          h("option", { value: "notification", selected: S.editTarget === "notification" }, "Notification: " + (n.f.name || n.sysId)),
+          h("option", { value: "notification", selected: S.editTarget === "notification" }, sourceLabel(n) + ": " + (n.f.name || n.sysId)),
           t ? h("option", { value: "template", selected: S.editTarget === "template" }, "Template: " + (t.f.name || t.sysId)) : null
         )
       ),
       target === t && sharedBy > 1 ? h("p", { class: "warn-text" }, `This template is used by ${sharedBy} imported notifications; edits affect all of them.`) : null,
       h("label", { class: "sn-field" }, "subject", h("input", { type: "text", value: val(target, "subject"), oninput: onEdit("subject") })),
-      h("label", { class: "sn-field" }, "message_html", h("textarea", { rows: 12, spellcheck: "false", class: "mono", oninput: onEdit("message_html") }, val(target, "message_html"))),
+      h(
+        "label",
+        { class: "sn-field" },
+        bodyField(target),
+        h("textarea", { rows: 12, spellcheck: "false", class: "mono", oninput: onEdit(bodyField(target)) }, val(target, bodyField(target)))
+      ),
       h(
         "div",
         { class: "sn-buttons" },
@@ -1131,7 +1297,7 @@
   function downloadXml(rec) {
     let raw = rec.raw;
     const edits = S.edits[rec.sysId] || {};
-    for (const field of ["subject", "message_html"]) {
+    for (const field of ["subject", bodyField(rec)]) {
       if (Object.prototype.hasOwnProperty.call(edits, field)) raw = C.replaceField(raw, field, edits[field]);
     }
     const file = S.files[rec.fileIdx];
@@ -1220,7 +1386,7 @@
     const items = [...S.notifications.values()]
       .filter((n) => categoryLabel(n) === cat)
       .sort((a, b) => (a.f.name || "").localeCompare(b.f.name || ""));
-    const active = items.filter((n) => C.isTrue(n.f.active)).length;
+    const active = items.filter((n) => isActive(n)).length;
     const scripted = items.filter((n) => C.hasAdvancedCondition(n.f)).length;
     const exported = [...new Set(items.map((n) => (S.files[n.fileIdx] || {}).unloadDate).filter(Boolean))].sort();
     const p = programFor(cat);
@@ -1240,7 +1406,7 @@
       String(i + 1),
       n.f.name || n.sysId,
       C.triggerSummary(n.f, n.conditionDisplay, { friendly: true }),
-      C.isTrue(n.f.active) ? "Yes" : "No",
+      isActive(n) ? "Yes" : "No",
       n.f.sys_updated_on || "",
     ]);
     return { items, summary, list, p };
@@ -1373,14 +1539,52 @@
   els.importGlossaryInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     e.target.value = "";
-    if (file) setStatus([await importGlossaryFile(file)]);
+    if (file) setStatus([await importCsvFile(file)]);
   });
+
+  // A dropped/picked CSV is either the inventory (has sys_id + Category
+  // columns: assign categories) or the glossary. Returns a status line.
+  async function importCsvFile(file) {
+    let rows;
+    try {
+      rows = C.parseCsv(await file.text());
+    } catch (err) {
+      return `${file.name}: could not read CSV - ${err.message}`;
+    }
+    const cats = C.readInventoryCategories(rows);
+    return cats ? applyInventoryCategories(file.name, cats) : importGlossaryRows(file.name, rows);
+  }
+
+  // Only HR email content / content delivery records take a category from
+  // the sheet; notifications keep ServiceNow's.
+  function applyInventoryCategories(fileName, cats) {
+    let applied = 0;
+    let ignored = 0;
+    Object.entries(cats).forEach(([id, cat]) => {
+      const n = S.notifications.get(id);
+      if (!n || isNotification(n) || cat === sourceLabel(n)) {
+        ignored++;
+        return;
+      }
+      S.assignedCategories[id] = cat;
+      applied++;
+    });
+    refreshFilterOptions();
+    renderList();
+    renderSelected();
+    updateCoverPanel(true);
+    return (
+      `${fileName}: inventory - categories assigned to ${applied} HR email content / content delivery record${applied === 1 ? "" : "s"}` +
+      (ignored ? ` (${ignored} rows left as they are: notifications keep ServiceNow's category, or the record isn't imported yet)` : "")
+    );
+  }
 
   // Applies a glossary CSV: variable meanings + sample values, mail script
   // descriptions + examples. Returns a status line.
-  async function importGlossaryFile(file) {
+  async function importGlossaryRows(fileName, rows) {
+    const file = { name: fileName };
     try {
-      const g = C.readGlossary(C.parseCsv(await file.text()));
+      const g = C.readGlossary(rows);
       Object.entries(g.variables).forEach(([name, v]) => {
         if (v.meaning) S.meanings[name] = v.meaning;
         if (v.example) S.sample[name] = v.example;

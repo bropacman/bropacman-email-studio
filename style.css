@@ -649,6 +649,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sn-cover #snCopyCover { width: 100%; margin-bottom: 4px; }
 .sn-cover-status { display: block; }
 
+.sn-category-input { flex: 1; min-width: 180px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 13px; }
+
 .sn-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
 
 .sn-detail { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
