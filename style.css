@@ -69,6 +69,20 @@ body {
   margin: 0;
 }
 
+.app-version {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #a8b3c9;
+  background: var(--brand-dark-soft);
+  border: 1px solid #2d3f61;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
 .brand p {
   margin: 3px 0 0;
   font-size: 13px;

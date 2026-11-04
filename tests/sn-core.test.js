@@ -251,3 +251,9 @@ test("fillHtml can show ${variable} names instead of sample values", () => {
   assert.doesNotMatch(out, /HRC1/);
   assert.match(out, /\[Dynamic content: x\]/);
 });
+
+test("index.html is stamped with the current build version", () => {
+  const V = require("../scripts/stamp-version.js");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.deepEqual(V.stampedVersions(html), [V.computeVersion()], "run: node scripts/stamp-version.js");
+});
