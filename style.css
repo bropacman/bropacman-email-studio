@@ -678,6 +678,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+.sn-detail code.tech { background: none; color: var(--muted); font-size: 11px; padding: 0; }
+
 .sn-cond { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
 .sn-nq { border-left: 3px solid #cddaf3; padding-left: 8px; margin-bottom: 6px; }
 .op { font-weight: 700; color: var(--muted); font-size: 11px; }

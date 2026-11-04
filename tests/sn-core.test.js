@@ -279,3 +279,41 @@ test("mail scripts can show a typed-in example instead of the placeholder", () =
   assert.match(out, /\[Dynamic content: other\]/);
   assert.match(C.fillHtml(html, {}), /\[Dynamic content: signature\]/);
 });
+
+test("friendly labels for fields and tables", () => {
+  const f = C.friendlyField;
+  assert.equal(f("opened_for"), "Opened for");
+  assert.equal(f("u_start_date"), "Start date");
+  assert.equal(f("opened_for.first_name"), "Opened for › First name");
+  assert.equal(f("subject_person.manager.name"), "Subject person › Manager › Name");
+  assert.equal(f("hr_service"), "HR service");
+  assert.equal(f("u_employee_id"), "Employee ID");
+  assert.equal(f("sys_updated_on"), "Updated");
+  assert.equal(f("active"), "Active");
+  const t = C.friendlyTable;
+  assert.equal(t("sn_hr_core_case"), "HR Case");
+  assert.equal(t("sn_hr_core_case_benefits"), "HR Case Benefits");
+  assert.equal(t("sn_hr_core_task"), "HR Task");
+  assert.equal(t("sn_hr_le_case"), "Lifecycle Event Case");
+  assert.equal(t("sys_user"), "User");
+  assert.equal(t("u_hr_requests"), "HR Requests");
+  assert.equal(t("x_acme_hrapp_onboarding_task"), "Onboarding Task");
+});
+
+test("summaries can use friendly labels", () => {
+  const n = {
+    collection: "sn_hr_core_case",
+    action_insert: "true",
+    condition: "transferred_fromISEMPTY^hr_service=abc^ORopened_for.u_start_dateISNOTEMPTY^stateNSAMEASu_prior_state",
+    recipient_fields: "opened_for,watch_list",
+    send_self: "true",
+  };
+  assert.equal(
+    C.triggerSummary(n, { "hr_service|=|abc": "General Inquiry" }, { friendly: true }),
+    'HR Case: when a record is inserted; if Transferred from is empty AND (HR service is "abc" (General Inquiry) OR ' +
+      "Opened for › Start date is not empty) AND State is different from field Prior state"
+  );
+  assert.equal(C.recipientsSummary(n, { friendly: true }), "Fields: Opened for, Watch list; Also sent to event creator");
+  // Without the option, technical names are unchanged.
+  assert.match(C.triggerSummary(n), /^sn_hr_core_case: .* transferred_from is empty/);
+});

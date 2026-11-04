@@ -232,6 +232,85 @@
   }
 
   // ---------------------------------------------------------------------
+  // Friendly labels for business readers
+  //
+  // Derived from the technical name - no dictionary export needed:
+  //   fields: drop a leading u_, underscores -> spaces, sentence case,
+  //           acronyms upper-cased, dot-walks joined with " › "
+  //           (opened_for.first_name -> "Opened for › First name")
+  //   tables: same, Title Case, with the scope prefix dropped
+  //           (sn_hr_core_case -> "HR Case"), plus a few standard tables
+  //           whose label doesn't follow the name.
+  // ---------------------------------------------------------------------
+
+  const ACRONYMS = new Set(["hr", "id", "url", "uri", "sla", "it", "pdf", "sms", "api", "ui", "pto", "vip", "faq", "kb", "csv", "ip", "le"]);
+
+  const FIELD_LABELS = {
+    sys_updated_on: "Updated",
+    sys_created_on: "Created",
+    sys_updated_by: "Updated by",
+    sys_created_by: "Created by",
+    sys_id: "Sys ID",
+    sys_class_name: "Class",
+    sys_mod_count: "Updates",
+    sys_domain: "Domain",
+  };
+
+  const TABLE_LABELS = {
+    task: "Task",
+    sys_user: "User",
+    sys_user_group: "Group",
+    incident: "Incident",
+    sc_request: "Request",
+    sc_req_item: "Requested Item",
+    sc_task: "Catalog Task",
+    sn_hr_le_case: "Lifecycle Event Case",
+  };
+
+  function words(name) {
+    return String(name || "")
+      .replace(/^u_/, "")
+      .split("_")
+      .filter(Boolean)
+      .map((w) => w.toLowerCase());
+  }
+
+  function upperFirst(w) {
+    return w ? w[0].toUpperCase() + w.slice(1) : w;
+  }
+
+  function friendlySegment(seg) {
+    if (FIELD_LABELS[seg]) return FIELD_LABELS[seg];
+    const ws = words(seg);
+    if (!ws.length) return seg;
+    return ws.map((w, i) => (ACRONYMS.has(w) ? w.toUpperCase() : i === 0 ? upperFirst(w) : w)).join(" ");
+  }
+
+  function friendlyField(path) {
+    if (!path) return path;
+    return String(path).split(".").map(friendlySegment).join(" › ");
+  }
+
+  function friendlyTable(name) {
+    const t = String(name || "").trim();
+    if (!t) return t;
+    if (TABLE_LABELS[t]) return TABLE_LABELS[t];
+    let rest = t;
+    let prefix = "";
+    const hr = /^sn_hr_(?:core_|le_|sp_)?(.*)$/.exec(t);
+    if (hr) {
+      rest = hr[1];
+      if (!/^hr(_|$)/.test(rest)) prefix = "HR ";
+    } else {
+      rest = t.replace(/^x_[a-z0-9]+_[a-z0-9]+_/, "").replace(/^sn_[a-z0-9]+_/, "");
+    }
+    const label = words(rest)
+      .map((w) => (ACRONYMS.has(w) ? w.toUpperCase() : upperFirst(w)))
+      .join(" ");
+    return (prefix + label).trim() || t;
+  }
+
+  // ---------------------------------------------------------------------
   // Encoded query -> plain English
   // ---------------------------------------------------------------------
 
@@ -251,8 +330,8 @@
     ["NOTLIKE", (v) => `does not contain ${q(v)}`],
     ["LIKE", (v) => `contains ${q(v)}`],
     ["NOT IN", (v) => `is not one of ${list(v)}`],
-    ["NSAMEAS", (v) => `is different from field ${v}`],
-    ["SAMEAS", (v) => `is the same as field ${v}`],
+    ["NSAMEAS", (v, name) => `is different from field ${name(v)}`],
+    ["SAMEAS", (v, name) => `is the same as field ${name(v)}`],
     ["BETWEEN", (v) => `is between ${v.split("@").map(q).join(" and ")}`],
     ["NOTON", (v) => `is not on ${q(dateLabel(v))}`],
     ["ON", (v) => `is on ${q(dateLabel(v))}`],
@@ -283,20 +362,25 @@
 
   // displayValues (optional): labels the export itself carried for
   // reference values, keyed "field|operator|value" (see
-  // conditionDisplayValues). Field names are never relabelled.
-  function translateTerm(term, displayValues) {
+  // conditionDisplayValues). opts.friendly shows field names as friendly
+  // labels (see friendlyField); otherwise they're shown as-is.
+  function translateTerm(term, displayValues, opts) {
     const m = OP_RE.exec(term);
     if (!m) return { field: null, text: `(untranslated: ${term})`, raw: term };
     const [, field, op, value] = m;
+    const friendly = !!(opts && opts.friendly);
+    const name = friendly ? friendlyField : (x) => x;
     const fn = OPERATORS.find(([o]) => o === op)[1];
     const label = displayValues && displayValues[`${field}|${op}|${value}`];
-    return { field, op, value, label, text: `${field} ${fn(value)}` + (label ? ` (${label})` : ""), raw: term };
+    const fieldLabel = name(field);
+    const phrase = fn(value, name);
+    return { field, fieldLabel, op, value, label, phrase, text: `${fieldLabel} ${phrase}` + (label ? ` (${label})` : ""), raw: term };
   }
 
   // Returns { queries: [ [ [term, ...OR'd], ...AND'd ], ...NQ OR'd ], text, notes }.
   // ^OR binds tighter than ^ (a^ORb^c means (a OR b) AND c), and ^NQ starts a
   // whole new query that is OR'd with the previous ones.
-  function translateCondition(encoded, displayValues) {
+  function translateCondition(encoded, displayValues, opts) {
     const src = (encoded || "").trim();
     if (!src) return { queries: [], text: "", notes: [] };
     const notes = [];
@@ -311,10 +395,10 @@
           return;
         }
         if (idx > 0 && /^OR(?![A-Z]*BY)/.test(tok) && clauses.length) {
-          clauses[clauses.length - 1].push(translateTerm(tok.slice(2), displayValues));
+          clauses[clauses.length - 1].push(translateTerm(tok.slice(2), displayValues, opts));
           return;
         }
-        clauses.push([translateTerm(tok, displayValues)]);
+        clauses.push([translateTerm(tok, displayValues, opts)]);
       });
       return clauses;
     });
@@ -365,17 +449,20 @@
     return !!(n.advanced_condition || "").trim();
   }
 
-  function triggerSummary(n, displayValues) {
-    const cond = translateCondition(n.condition, displayValues);
-    let s = `${n.collection || "(no table)"}: ${triggerParts(n).join(", ")}`;
+  // opts.friendly: table and field names as friendly labels.
+  function triggerSummary(n, displayValues, opts) {
+    const friendly = !!(opts && opts.friendly);
+    const cond = translateCondition(n.condition, displayValues, opts);
+    const table = n.collection ? (friendly ? friendlyTable(n.collection) : n.collection) : "(no table)";
+    let s = `${table}: ${triggerParts(n).join(", ")}`;
     if (cond.text) s += `; if ${cond.text}`;
     if (hasAdvancedCondition(n)) s += "; plus custom script logic (ask HRIT)";
     return s;
   }
 
-  function recipientsSummary(n) {
+  function recipientsSummary(n, opts) {
     const bits = [];
-    const fields = splitList(n.recipient_fields);
+    const fields = splitList(n.recipient_fields).map((f) => (opts && opts.friendly ? friendlyField(f) : f));
     const users = splitList(n.recipient_users);
     const groups = splitList(n.recipient_groups);
     if (fields.length) bits.push(`Fields: ${fields.join(", ")}`);
@@ -383,7 +470,7 @@
     if (groups.length) bits.push(`Groups: ${groups.join(", ")}`);
     if (isTrue(n.event_parm_1)) bits.push("Event parm 1 contains recipient");
     if (isTrue(n.event_parm_2)) bits.push("Event parm 2 contains recipient");
-    if (isTrue(n.send_self)) bits.push("Also sent to event creator (send_self)");
+    if (isTrue(n.send_self)) bits.push(opts && opts.friendly ? "Also sent to event creator" : "Also sent to event creator (send_self)");
     return bits.length ? bits.join("; ") : "(no recipients configured)";
   }
 
@@ -606,6 +693,8 @@
     fillHtml,
     fillText,
     isRelativeUrl,
+    friendlyField,
+    friendlyTable,
     parseUnloadDate,
     safeHttpUrl,
     imagesToPlaceholder,

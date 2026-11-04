@@ -302,10 +302,11 @@
   // ------------------------------------------------------------------
 
   function refreshFilterOptions() {
-    const fill = (select, values, allLabel) => {
+    const fill = (select, values, allLabel, labelOf) => {
       const cur = select.value;
       select.replaceChildren(new Option(allLabel, ""));
-      [...values].sort((a, b) => a.localeCompare(b)).forEach((v) => select.add(new Option(v, v)));
+      const label = labelOf || ((v) => v);
+      [...values].sort((a, b) => label(a).localeCompare(label(b))).forEach((v) => select.add(new Option(label(v), v)));
       select.value = values.has(cur) ? cur : "";
     };
     const cats = new Set();
@@ -315,7 +316,7 @@
       tables.add(n.f.collection || "(no table)");
     });
     fill(els.fCategory, cats, "All categories");
-    fill(els.fTable, tables, "All tables");
+    fill(els.fTable, tables, "All tables", (t) => (t === "(no table)" ? t : C.friendlyTable(t)));
   }
 
   function filteredNotifications() {
@@ -373,7 +374,7 @@
       name.textContent = n.f.name || n.sysId;
       const meta = document.createElement("span");
       meta.className = "sn-item-meta";
-      meta.append(n.f.collection || "(no table)");
+      meta.append(n.f.collection ? C.friendlyTable(n.f.collection) : "(no table)");
       if (!C.isTrue(n.f.active)) meta.append(badge("Inactive", "muted"));
       if (C.hasAdvancedCondition(n.f)) meta.append(badge("Script logic", "warn"));
       const t = templateOf(n);
@@ -434,7 +435,7 @@
   }
 
   function conditionBlock(n) {
-    const t = C.translateCondition(n.f.condition, n.conditionDisplay);
+    const t = C.translateCondition(n.f.condition, n.conditionDisplay, { friendly: true });
     if (!t.queries.length) return h("p", { class: "muted" }, "No condition: sends whenever the trigger happens.");
     const queryList = (clauses) =>
       h(
@@ -461,18 +462,34 @@
     );
   }
 
-  // Field names are shown as-is. If the export itself carried a display
-  // label for a reference value (from the condition's <item> rows), show it
-  // next to the raw value - otherwise nothing is invented.
+  // A friendly label with the technical name beside it in small grey type,
+  // so business readers see the label and admins can still see the name.
+  function labelWithName(label, name) {
+    return label === name ? code(name) : h("span", null, h("strong", null, label), " ", h("code", { class: "tech" }, name));
+  }
+
+  // Condition term: friendly field label (technical name beside it). If the
+  // export carried a display label for a reference value (from the
+  // condition's <item> rows), it's shown after the raw value.
   function termNode(term) {
-    const rest = term.text.slice(term.field.length + 1);
-    const tail = term.label ? ` (${term.label})` : "";
-    return h("span", null, code(term.field), " ", tail ? rest.slice(0, -tail.length) : rest, tail ? h("span", { class: "muted" }, tail) : null);
+    return h(
+      "span",
+      null,
+      labelWithName(term.fieldLabel, term.field),
+      " ",
+      term.phrase,
+      term.label ? h("span", { class: "muted" }, ` (${term.label})`) : null
+    );
   }
 
   function listOrNone(v) {
     const items = C.splitList(v);
     return items.length ? h("span", null, items.map((x, i) => [i ? ", " : "", code(x)])) : "";
+  }
+
+  function fieldListOrNone(v) {
+    const items = C.splitList(v);
+    return items.length ? h("span", null, items.map((x, i) => [i ? ", " : "", labelWithName(C.friendlyField(x), x)])) : "";
   }
 
   function yesNo(v) {
@@ -684,7 +701,7 @@
       section(
         "When it sends",
         kv([
-          ["Table", code(n.f.collection || "(none)")],
+          ["Table", n.f.collection ? labelWithName(C.friendlyTable(n.f.collection), n.f.collection) : "(none)"],
           ["Trigger", C.triggerParts(n.f).join(", ")],
           ["Insert / update", `insert: ${yesNo(n.f.action_insert)}, update: ${yesNo(n.f.action_update)}`],
           n.f.generation_type === "event" || (!n.f.generation_type && n.f.event_name) ? ["Event", code(n.f.event_name || "(none)")] : null,
@@ -705,7 +722,7 @@
       section(
         "Who receives it",
         kv([
-          ["Recipient fields", listOrNone(n.f.recipient_fields)],
+          ["Recipient fields", fieldListOrNone(n.f.recipient_fields)],
           ["Users", listOrNone(n.f.recipient_users)],
           ["Groups", listOrNone(n.f.recipient_groups)],
           ["Event parm 1 is recipient", yesNo(n.f.event_parm_1)],
@@ -841,7 +858,7 @@
     }
     const e = effective(n);
     els.pvFrom.textContent = n.f.from || DEFAULT_FROM;
-    els.pvTo.textContent = C.recipientsSummary(n.f);
+    els.pvTo.textContent = C.recipientsSummary(n.f, { friendly: true });
     els.pvSubject.textContent = C.fillText(e.subject, S.sample) || "(no subject)";
     // Relative image URLs point at the instance and can't load here; show
     // a [Logo] label instead of a broken-image icon. Full URLs still load.
@@ -878,7 +895,7 @@
     const fields = C.splitList(n.f.recipient_fields);
     const users = C.splitList(n.f.recipient_users).length;
     const groups = C.splitList(n.f.recipient_groups).length;
-    if (fields.length) bits.push(fields.join(", "));
+    if (fields.length) bits.push(fields.map(C.friendlyField).join(", "));
     if (users) bits.push(`${users} user${users > 1 ? "s" : ""}`);
     if (groups) bits.push(`${groups} group${groups > 1 ? "s" : ""}`);
     if (C.isTrue(n.f.event_parm_1)) bits.push("event parm 1");
@@ -912,7 +929,7 @@
     // Kept short on purpose - the full config is in the inventory sheet.
     const rows = [
       ["Notification", n.f.name || ""],
-      ["When it sends", C.triggerSummary(n.f, n.conditionDisplay)],
+      ["When it sends", C.triggerSummary(n.f, n.conditionDisplay, { friendly: true })],
       ["Last updated", n.f.sys_updated_on || ""],
     ];
     if (isEdited(n) || isEdited(e.template)) rows.push(["Note", "Contains proposed edits that are not yet in ServiceNow."]);
@@ -965,6 +982,7 @@
     "Name",
     "Category",
     "Table",
+    "Table name",
     "Trigger summary",
     "Recipients summary",
     "Active",
@@ -981,9 +999,10 @@
       ...filteredNotifications().map((n) => [
         n.f.name || "",
         categoryLabel(n),
+        n.f.collection ? C.friendlyTable(n.f.collection) : "",
         n.f.collection || "",
-        C.triggerSummary(n.f, n.conditionDisplay),
-        C.recipientsSummary(n.f),
+        C.triggerSummary(n.f, n.conditionDisplay, { friendly: true }),
+        C.recipientsSummary(n.f, { friendly: true }),
         C.isTrue(n.f.active) ? "true" : "false",
         C.hasAdvancedCondition(n.f) ? "Y" : "N",
         usesMailScripts(n) ? "Y" : "N",
@@ -1205,7 +1224,7 @@
     const list = items.map((n, i) => [
       String(i + 1),
       n.f.name || n.sysId,
-      C.triggerSummary(n.f, n.conditionDisplay),
+      C.triggerSummary(n.f, n.conditionDisplay, { friendly: true }),
       C.isTrue(n.f.active) ? "Yes" : "No",
       n.f.sys_updated_on || "",
     ]);
