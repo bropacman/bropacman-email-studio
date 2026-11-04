@@ -626,14 +626,48 @@
   const PREVIEW_HEAD =
     '<base target="_blank"><meta charset="utf-8"><style>body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#1c2430;}</style>';
 
-  // The part of a layout worth reviewing in a Doc: the table cell that holds
-  // ${notification:body}. Real layouts often put more content in that same
-  // cell (a headline mail script, a case-details table, a disclaimer) while
-  // the banner, footer and background sit in other rows. The cell's text
-  // styling (font, size, colour) is carried onto a wrapper so the body
-  // still looks like the email. Falls back to the whole layout if the
-  // placeholder isn't inside a cell.
-  function layoutContentArea(layoutHtml) {
+  // ------------------------------------------------------------------
+  // Simplified layout for Google Docs
+  //
+  // Real layouts shape the email with nested tables, fixed heights/widths,
+  // background colours and spacer rows - all of which distort a Doc. For
+  // review we keep every piece of *text* the layout contributes, in a flat
+  // shape:
+  //   - rows above the body  -> one simple coloured banner (text + colour)
+  //   - the row holding ${notification:body} -> its full content (headline,
+  //     details table, disclaimer, body, signature...), with the cell's
+  //     font/size/colour carried onto a wrapper
+  //   - rows below the body  -> plain footer text under a thin line
+  // Anything outside the table that holds those rows (grey background,
+  // spacer tables) is dropped. Falls back to the whole layout if the
+  // placeholder isn't inside a table cell.
+  // ------------------------------------------------------------------
+
+  const TEXT_STYLE_PROPS = /^(font-family|font-size|font-weight|font-style|color|line-height|text-align)\s*:/i;
+
+  function textStyleOf(el, extra) {
+    const props = (el.getAttribute("style") || "")
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => TEXT_STYLE_PROPS.test(s));
+    if (!props.some((s) => /^text-align/i.test(s)) && el.getAttribute("align")) props.push(`text-align: ${el.getAttribute("align")}`);
+    return props.concat(extra || []).join("; ");
+  }
+
+  function backgroundOf(el) {
+    for (const node of [el, ...el.querySelectorAll("*")]) {
+      const m = /background(?:-color)?\s*:\s*(#[0-9a-f]{3,8}|rgba?\([^)]*\)|[a-z]+)/i.exec(node.getAttribute("style") || "");
+      if (m && !/^(transparent|none|inherit)$/i.test(m[1])) return m[1];
+      if (node.getAttribute("bgcolor")) return node.getAttribute("bgcolor");
+    }
+    return null;
+  }
+
+  function wrapWithStyle(style, html) {
+    return style ? `<div style="${C.escapeHtml(style)}">${html}</div>` : html;
+  }
+
+  function simplifyLayout(layoutHtml) {
     const marker = "${notification:body}";
     if (!layoutHtml || !layoutHtml.includes(marker)) return layoutHtml;
     const doc = new DOMParser().parseFromString(layoutHtml, "text/html");
@@ -642,23 +676,73 @@
     while ((node = walker.nextNode()) && !node.nodeValue.includes(marker));
     const cell = node && node.parentElement.closest("td, th");
     if (!cell) return layoutHtml;
-    const textStyle = (cell.getAttribute("style") || "")
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => /^(font-family|font-size|color|line-height)\s*:/i.test(s))
-      .join("; ");
-    return textStyle ? `<div style="${C.escapeHtml(textStyle)}">${cell.innerHTML}</div>` : cell.innerHTML;
+    const row = cell.closest("tr");
+    const table = row.closest("table");
+    const rows = [...table.rows];
+    const bodyIdx = rows.indexOf(row);
+    const parts = [];
+    rows.forEach((tr, i) => {
+      if (i === bodyIdx) {
+        parts.push(wrapWithStyle(textStyleOf(cell), cell.innerHTML));
+        return;
+      }
+      const hasImage = !!tr.querySelector("img");
+      const text = tr.textContent.replace(/\s+/g, " ").trim();
+      if (!text && !hasImage) return; // spacer row
+      if (i < bodyIdx) {
+        // Banner: the row's text (images become [Logo]) on its background colour.
+        const clone = tr.cloneNode(true);
+        clone.querySelectorAll("img").forEach((img) => img.replaceWith(doc.createTextNode(C.IMAGE_PLACEHOLDER)));
+        const cellsText = [...clone.querySelectorAll("td, th")]
+          .filter((c) => !c.querySelector("td, th"))
+          .map((c) => c.textContent.replace(/\s+/g, " ").trim())
+          .filter(Boolean);
+        const label = (cellsText.length ? cellsText : [clone.textContent.replace(/\s+/g, " ").trim()]).join("    ");
+        parts.push(D.bannerTable(label, backgroundOf(tr) || "#293e40"));
+      } else {
+        // Footer: keep its text and inline formatting, drop its box styling.
+        const cells = [...tr.cells].map((c) => wrapWithStyle(textStyleOf(c), c.innerHTML));
+        parts.push('<hr style="border:0;border-top:1px solid #c7ced9;margin:12pt 0;">' + cells.join(""));
+      }
+    });
+    return parts.join("\n");
   }
 
-  // mode: "full" (whole layout), "content" (layout's content cell only) or
-  // "body" (just the notification/template body).
+  // Removes the sizing that bends a Google Doc out of shape: fixed heights
+  // anywhere, pixel widths / max-widths on tables and cells, auto margins.
+  // Percentage widths (e.g. a 40% label column) are kept.
+  function flattenSizing(html) {
+    const doc = new DOMParser().parseFromString(`<div id="__root">${html}</div>`, "text/html");
+    const root = doc.getElementById("__root");
+    root.querySelectorAll("*").forEach((el) => {
+      el.removeAttribute("height");
+      const isTableish = /^(TABLE|TD|TH|TR|TBODY)$/.test(el.tagName);
+      if (isTableish && /px$|^\d+$/.test(el.getAttribute("width") || "")) el.removeAttribute("width");
+      const style = el.getAttribute("style");
+      if (!style) return;
+      const kept = style
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((s) => {
+          if (/^(height|min-height|max-height)\s*:/i.test(s)) return false;
+          if (isTableish && /^(width|max-width|min-width)\s*:\s*[\d.]+px/i.test(s)) return false;
+          if (/^margin\s*:.*auto/i.test(s)) return false;
+          return true;
+        });
+      if (kept.length) el.setAttribute("style", kept.join("; "));
+      else el.removeAttribute("style");
+    });
+    return root.innerHTML;
+  }
+
+  // mode: "full" (whole layout, used by the preview), "simple" (simplified
+  // layout for Docs) or "body" (just the notification/template body).
   function renderedEmail(n, mode) {
     const e = effective(n);
-    let layout = "";
-    if (e.layoutHtml && mode === "full") layout = e.layoutHtml;
-    else if (e.layoutHtml && mode === "content") layout = layoutContentArea(e.layoutHtml);
-    const html = layout ? C.wrapInLayout(layout, e.body) : e.body;
-    return C.fillHtml(html, S.sample);
+    if (!e.layoutHtml || mode === "body") return C.fillHtml(e.body, S.sample);
+    if (mode === "simple") return flattenSizing(C.fillHtml(C.wrapInLayout(simplifyLayout(e.layoutHtml), e.body), S.sample));
+    return C.fillHtml(C.wrapInLayout(e.layoutHtml, e.body), S.sample);
   }
 
   function renderPreview() {

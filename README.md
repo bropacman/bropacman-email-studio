@@ -57,9 +57,12 @@ notification into something a process owner can read and comment on:
 - **Copy for Google Docs**: a header table (name, subject, when it sends, who
   receives it, template, active, last updated, sys_id) above the rendered
   email, for pasting into that notification's tab in the program's Doc. By
-  default it includes only the layout's **content area**: the table cell
-  holding `${notification:body}`, which often also holds a headline or
-  case-details table. The banner, footer and background are left out. You
+  default it uses a **simplified layout**: all of the layout's text is
+  kept, but the shape is flattened so the Doc isn't distorted. The rows
+  above the body become one plain colored banner. The row holding
+  `${notification:body}` keeps its full content (headline, details table,
+  disclaimer, body, signature). The rows below become footer text under a
+  thin line. The background, spacer rows and fixed sizes are dropped. You
   can switch to the full layout or the notification body only. Images become
   a `[Logo]` label, both in the Doc and wherever a relative image URL can't
   load in the preview.
